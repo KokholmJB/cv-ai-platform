@@ -42,6 +42,26 @@ type SetupFormState = {
   };
 };
 
+type InterviewResult =
+  | {
+      status: "idle";
+      message: null;
+      question: null;
+      focusArea: null;
+    }
+  | {
+      status: "continue";
+      message: null;
+      question: string;
+      focusArea: string;
+    }
+  | {
+      status: "complete";
+      message: string;
+      question: null;
+      focusArea: null;
+    };
+
 const steps: { id: StepId; label: string; eyebrow: string; title: string }[] = [
   {
     id: "intro",
@@ -178,6 +198,15 @@ function ProgressPill({
 export function SetupFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formState, setFormState] = useState<SetupFormState>(initialState);
+  const [interviewResult, setInterviewResult] = useState<InterviewResult>({
+    status: "idle",
+    message: null,
+    question: null,
+    focusArea: null,
+  });
+  const [interviewAnswer, setInterviewAnswer] = useState("");
+  const [interviewErrorMessage, setInterviewErrorMessage] = useState<string | null>(null);
+  const [isInterviewLoading, setIsInterviewLoading] = useState(false);
 
   const progressValue = useMemo(
     () => Math.round(((currentStep + 1) / steps.length) * 100),
@@ -224,6 +253,161 @@ export function SetupFlow() {
 
   function goBack() {
     setCurrentStep((step) => Math.max(step - 1, 0));
+  }
+
+  async function requestInterviewTurn(lastAssistantQuestion: string | null, lastUserAnswer: string | null) {
+    setIsInterviewLoading(true);
+    setInterviewErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/onboarding/interview", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          phase: "initial",
+          profileDraft: {
+            name: formState.profile.navn,
+            currentRole: formState.profile.nuvaerendeTitel,
+            yearsExperience: formState.profile.erfaring,
+            targetDirection: formState.preferences.jobtype,
+          },
+          lastAssistantQuestion,
+          lastUserAnswer,
+        }),
+      });
+
+      const data = (await response.json()) as
+        | {
+            ok: true;
+            status: "continue";
+            question: string;
+            focusArea: string;
+          }
+        | {
+            ok: true;
+            status: "complete";
+          }
+        | {
+            ok: false;
+            error?: string;
+          };
+
+      if (!response.ok || !data.ok) {
+        setInterviewErrorMessage("Kunne ikke hente næste spørgsmål lige nu.");
+        return;
+      }
+
+      if (data.status === "complete") {
+        setInterviewResult({
+          status: "complete",
+          message: "JobPilot har nok information til fase 1 og kan gå videre til profilvurdering.",
+          question: null,
+          focusArea: null,
+        });
+        setInterviewAnswer("");
+        return;
+      }
+
+      setInterviewResult({
+        status: "continue",
+        message: null,
+        question: data.question,
+        focusArea: data.focusArea,
+      });
+      setInterviewAnswer("");
+    } catch {
+      setInterviewErrorMessage("Kunne ikke hente næste spørgsmål lige nu.");
+    } finally {
+      setIsInterviewLoading(false);
+    }
+  }
+
+  async function startInterview() {
+    await requestInterviewTurn(null, null);
+  }
+
+  async function continueInterview() {
+    if (interviewResult.status !== "continue") {
+      return;
+    }
+
+    const trimmedAnswer = interviewAnswer.trim();
+
+    if (!trimmedAnswer) {
+      setInterviewErrorMessage("Skriv et kort svar for at fortsætte.");
+      return;
+    }
+
+    await requestInterviewTurn(interviewResult.question, trimmedAnswer);
+  }
+
+  function renderInterviewPanel() {
+    return (
+      <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Første AI-spørgsmål
+          </p>
+          <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+            Start den første interviewrunde
+          </h3>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+            JobPilot bruger din basisprofil og din jobretning til at stille det første målrettede spørgsmål.
+          </p>
+        </div>
+
+        {interviewResult.status === "idle" ? (
+          <div className="mt-6 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm leading-7 text-slate-700">
+              Når du er klar, kan du starte den første AI-runde med knappen nederst.
+            </p>
+          </div>
+        ) : null}
+
+        {interviewResult.status === "continue" ? (
+          <div className="mt-6 space-y-4">
+            <div className="rounded-[1.25rem] border border-cyan-100 bg-cyan-50/80 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-950">
+                Fokusområde: {interviewResult.focusArea}
+              </p>
+              <p className="mt-3 text-base leading-7 text-slate-800">{interviewResult.question}</p>
+            </div>
+
+            <TextAreaField
+              label="Dit svar"
+              value={interviewAnswer}
+              onChange={setInterviewAnswer}
+              rows={4}
+            />
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={continueInterview}
+                disabled={isInterviewLoading}
+                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isInterviewLoading ? "Henter næste spørgsmål..." : "Fortsæt"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {interviewResult.status === "complete" ? (
+          <div className="mt-6 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm leading-7 text-slate-700">{interviewResult.message}</p>
+          </div>
+        ) : null}
+
+        {interviewErrorMessage ? (
+          <div className="mt-6 rounded-[1.25rem] border border-rose-200 bg-rose-50 p-5">
+            <p className="text-sm leading-7 text-rose-700">{interviewErrorMessage}</p>
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   function renderStep() {
@@ -548,6 +732,8 @@ export function SetupFlow() {
                 ]}
               />
             </div>
+
+            {renderInterviewPanel()}
           </div>
         );
       default:
@@ -631,14 +817,20 @@ export function SetupFlow() {
             >
               Gem og fortsæt senere
             </button>
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={isLastStep}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isLastStep ? "Klar til næste fase" : "Næste"}
-            </button>
+            {!isLastStep || interviewResult.status === "idle" ? (
+              <button
+                type="button"
+                onClick={isLastStep ? startInterview : goNext}
+                disabled={isInterviewLoading}
+                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isLastStep
+                  ? isInterviewLoading
+                    ? "Starter..."
+                    : "Start AI-interview"
+                  : "Næste"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
