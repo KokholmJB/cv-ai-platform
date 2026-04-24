@@ -19,7 +19,7 @@ type ProfileDraft = {
   targetDirection?: string;
 };
 
-function isShortString(value: unknown, maxLength = 300) {
+function isShortString(value: unknown, maxLength = 300): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
 }
 
@@ -122,20 +122,20 @@ export async function POST(request: Request) {
   const profileDraft: ProfileDraft = {};
 
   for (const key of ["name", "currentRole", "yearsExperience", "targetDirection"] as const) {
-    const value = profileDraftInput[key];
+    const rawValue = profileDraftInput[key];
 
-    if (value === undefined) {
+    if (rawValue === undefined) {
       continue;
     }
 
-    if (!isShortString(value)) {
+    if (!isShortString(rawValue)) {
       return Response.json({
         ok: false,
         error: `Invalid ${key}.`,
       });
     }
 
-    profileDraft[key] = value.trim();
+    profileDraft[key] = rawValue.trim();
   }
 
   const lastUserAnswer = payload.lastUserAnswer;
