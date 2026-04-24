@@ -1,5 +1,12 @@
 # Current Implementation Status
 
+## Core Subsystem Framing
+
+- the interview engine is now treated as a standalone core subsystem, not only as an onboarding helper
+- this subsystem is expected to become the profiling foundation for later job-fit evaluation, CV generation, application generation, transparent profile review, and persistence-compatible profile storage
+- the current implementation is functional, but it is not yet done by the stricter Interview Engine v1 Definition of Done
+- the new canonical subsystem spec is `docs/interview-engine-v1-definition-of-done.md`
+
 ## Product Direction Confirmed
 
 - JobPilot is an AI job-search operating system, not a CV builder
@@ -9,6 +16,8 @@
 - the system must understand both who the person is and how they fit the market
 - v1 scope is Denmark only and Danish only
 - the architecture should support later expansion to the Nordics, then Germany, then broader Europe without rewriting the core profile model
+- the interview engine must be strong enough to support multiple user segments, not only management or white-collar profiles
+- the profiling model should be serious and operational, not shallow
 
 ## Profiling Scope To Support
 
@@ -25,6 +34,38 @@ The onboarding system is expected to eventually support:
 - confidence and uncertainty
 - market context
 - geo context
+- evidence-aware use of uploaded and pre-collected material
+
+## Evidence-Aware Interview Requirement
+
+Evidence-aware document intake is now a confirmed interview-engine requirement.
+
+The interview engine must eventually account for:
+
+- uploaded CVs
+- education documents
+- certificates and licenses
+- prior application material
+- setup profile text
+- other serious supporting career material
+
+The engine must use that material to:
+
+- understand what is already known
+- identify uncertainty
+- identify missing proof
+- detect weak material quality
+- drive targeted gap-closing follow-up questions
+- judge whether the evidence is strong enough for the intended profile level
+
+This is not implemented yet.
+
+Current interview logic still works primarily from:
+
+- minimal profile draft fields
+- live Q&A turns
+
+This must be addressed before the interview engine can be considered done by the stricter Definition of Done.
 
 ## Market And Geography Principles
 
@@ -81,8 +122,7 @@ Additional design implications:
 ## Verified Technical Status
 
 - the setup flow is live on production
-- `main` is clean and synced after merge
-- current working branch is `feature/setup-persistence`
+- the active repository branch for this snapshot is `main`
 - `OPENAI_API_KEY` is configured locally in `.env.local` and has been verified server-side
 - `GET /api/health/openai` exists and confirms key presence without exposing it
 - `GET /api/test/openai` exists and successfully verifies the OpenAI Responses API with `gpt-5.4-mini`
@@ -92,9 +132,13 @@ Additional design implications:
 - it returns a strict `focusArea` enum
 - it supports multi-turn context through `lastAssistantQuestion` and `lastUserAnswer`
 - it uses strict JSON parsing and validation for model output
+- it can now return either `status: "continue"` or `status: "complete"`
+- it can return a structured `profileSummary` on completion
+- it includes a simple repetition guard against near-duplicate same-focus follow-up questions
+- the `/setup` UI can start the interview, continue one additional turn, and render the completed phase-1 profile summary
 - it does not yet persist interview state
-- it does not yet produce a final structured profile output
-- stop and sufficiency logic is the next active backend step being worked on
+- it does not yet satisfy the stricter coverage, completion-gate, and segment-robustness requirements defined for Interview Engine v1
+- it does not yet account for uploaded or pre-collected evidence quality as part of interview sufficiency
 
 ## Explicit Boundaries
 
@@ -109,9 +153,21 @@ The following are not built yet:
 - no CV or application generation pipeline yet
 - no localization beyond Denmark and Danish
 - no open user-facing AI chat
+- no interview engine completion-gate system that is yet strong enough to be considered done by the new subsystem definition
+- no broad segment-level acceptance validation across trades, care, warehouse, support, leadership, and unclear-direction users yet
+- no implemented document and evidence intake layer inside the interview engine yet
 
 ## Current Next Step
 
-Finish and validate backend onboarding sufficiency and status logic.
+Complete the interview engine to the new Definition of Done before broader product expansion.
 
-Continue only after that works.
+Ordered workstream:
+
+- harden completion gates
+- improve coverage rules
+- strengthen output quality
+- improve UI transparency for completed profile
+- add transparent profile review
+- only then prepare persistence-compatible storage design
+
+Continue only after the interview engine is materially closer to that standard.

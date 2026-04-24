@@ -78,6 +78,8 @@ The design principle for v1 is therefore:
 
 Collect a universal minimum. Expand only where uncertainty affects job evaluation, personalization, or workflow continuity.
 
+This hybrid model must eventually include a document and evidence intake layer. Adaptive interviewing is not sufficient on its own if the system ignores serious user-provided material that already contains facts, credentials, examples, or evidence gaps.
+
 ## 3. Universal profile dimensions
 
 These dimensions should exist for all users regardless of profession. They form the common language JobPilot uses to score jobs, personalize outputs, preserve context over time, and later compare the user profile against changing market conditions.
@@ -142,6 +144,7 @@ Operational use:
 - improves seriousness of later apply-or-not decisions
 - supports document generation without generic inflation
 - helps the system detect when a transition story lacks proof
+- helps the system distinguish between evidence already present in uploaded material and evidence that still must be elicited through interview follow-up
 
 ### Career direction
 
@@ -345,6 +348,34 @@ Operational use:
 - avoids premature Europe-wide localization logic
 - gives the architecture a clean path to later regional expansion
 
+## 3A. Document And Evidence Intake Layer
+
+Adaptive onboarding must include a document and evidence intake layer as part of the serious profiling architecture.
+
+This layer should eventually evaluate:
+
+- uploaded CVs
+- education documentation
+- certificates and licenses
+- prior application material
+- profile text entered during setup
+- other structured or semi-structured career material the user provides
+
+The purpose of this layer is to:
+
+- extract known facts before asking follow-up questions
+- identify uncertainty rather than asking blind generic questions
+- identify missing proof or weak support
+- detect weak material quality
+- feed evidence gaps into the interview engine
+
+The interview engine should therefore eventually work from both:
+
+- live interview answers
+- document and evidence intake signals
+
+This is a hard subsystem requirement. The engine must not be considered serious if it can only profile from minimal draft fields plus live Q&A.
+
 ## 4. Role-specific interview modules
 
 These modules extend the universal profile when the user's background suggests additional dimensions matter. A user may activate more than one module if their profile spans categories.
@@ -527,6 +558,16 @@ The interview engine should decide the next question based on information value,
 
 The decision logic for the next question should prioritize:
 
+### What the material already answers
+
+If uploaded or pre-collected material already answers a question clearly, the engine should not ask it again. Instead, it should move to what the material does not prove strongly enough.
+
+Examples:
+
+- if the CV already establishes current role and recent timeline, do not re-ask for basic orientation
+- if certificates already establish a qualification, do not ask for it again as if it were unknown
+- if existing profile text already clarifies target direction, the engine should move to transition support, fit, or evidence quality
+
 ### Missing information
 
 If a high-impact profile dimension is absent, ask for it next. High-impact means missing data that directly weakens job scoring, eligibility filtering, or personalization.
@@ -602,6 +643,67 @@ Examples:
 - under-marketed leadership or training responsibility
 
 The engine should ask the next question that most improves JobPilot's ability to evaluate, rank, and personalize. It should stop asking once additional questions are low-value relative to current confidence.
+
+## 5A. Evidence Quality Model
+
+The engine must judge not only whether data exists, but whether it is strong enough.
+
+The evidence quality model should evaluate:
+
+- role clarity
+- timeline clarity
+- responsibility clarity
+- result or evidence strength
+- case or example availability
+- progression and seniority signals
+- tool, system, or domain specificity
+- transition support
+- credibility of claims
+- whether the material is too weak for the target profile level
+
+This matters because:
+
+- a CV may exist but still be weak
+- a certificate may prove eligibility but not level
+- profile text may state ambition without proving relevance
+- prior applications may show positioning attempts without showing evidence quality
+
+The system must distinguish between:
+
+- evidence already available
+- evidence missing entirely
+- evidence present but too weak for the intended profile level
+
+## 5B. Gap-Closing Interview Logic
+
+The interview must use existing material and ask targeted follow-up questions when the evidence is too thin.
+
+Examples of gaps it may need to close:
+
+- missing measurable results
+- missing concrete cases
+- missing examples of ownership
+- missing seniority indicators
+- missing evidence for role transition
+- missing proof for strategic, product, or leadership relevance
+- missing examples of tools, systems, or domain depth
+- missing motivation, no-go, or fit clarity
+
+The engine must not just ask generic questions if uploaded material already contains the answer.
+
+It must ask to close real evidence gaps.
+
+## 5C. Profile Strength Versus Goal Level
+
+The engine must compare current material quality against the level and type of profile the user is trying to build.
+
+Examples:
+
+- if the user wants a senior, strategic, product, or leadership profile but the material only shows generic task descriptions, that should be recognized as insufficient
+- if a result-heavy or case-heavy profile is needed but no evidence exists, the engine must try to elicit it
+- if a role is better supported by responsibility or regulated-task framing than by quantified results, that should also be recognized
+
+This comparison matters because JobPilot must understand not only what the user wants, but whether the available material can credibly support that profile position.
 
 ## 6. Confidence and sufficiency model
 
@@ -687,6 +789,8 @@ Follow-up should happen later when:
 - a target role requires proof not yet captured
 - generated documents would benefit from stronger evidence or tone calibration
 - the market response suggests the profile is incomplete or mispositioned
+
+Completion should later depend not only on enough answers, but also on sufficient evidence quality for the intended downstream use.
 
 ## 7. Market And Geography Principles
 
@@ -873,6 +977,29 @@ Practical notes for v1:
 - unresolved areas should be first-class data, not hidden in notes
 - confidence should exist at the profile level even if the scoring model is simple at first
 - the structure should support partial completion and later updates
+- the profile should later be able to represent whether downstream writing is primarily supported by task evidence, result evidence, case evidence, or transition evidence
+
+## 8A. Downstream Relevance Of Evidence-Aware Profiling
+
+Evidence-aware profiling is required because later CV and application generation must be able to choose between:
+
+- task-based framing
+- result-based framing
+- case-based framing
+- transition-based framing
+
+depending on:
+
+- the target job
+- the intended profile level
+- the actual strength of available evidence
+
+If the interview engine does not understand document quality and evidence strength, downstream generation will either:
+
+- overclaim
+- underuse strong material
+- default to generic phrasing
+- fail to support realistic transitions properly
 
 ## 9. Cost And Usage Governance
 
@@ -1001,6 +1128,8 @@ What should wait:
 - multi-user org workflows
 - backend memory orchestration beyond the simplest persistence layer
 
+However, evidence-aware intake itself should not be treated as optional future polish. It belongs inside the serious interview-engine definition even if the full file-ingestion implementation matures in phases.
+
 V1 should not try to fully understand the person as a human being. It should understand the person well enough as a job-search actor to improve decisions, personalization, and continuity.
 
 ## 12. Recommended next implementation step
@@ -1017,3 +1146,24 @@ Why this should come next:
 - it should be proven before persistence, database, or profile-output work expands around it
 
 Continue only after the sufficiency logic works reliably.
+
+## 13. Interview Engine As Standalone Core Subsystem
+
+The adaptive onboarding interview should now be treated as a standalone core subsystem, not as a lightweight helper inside setup.
+
+Implications:
+
+- the interview engine is the profiling foundation for later job-fit evaluation
+- the interview engine is the profiling foundation for later CV and application generation
+- the interview engine is the profiling foundation for later transparent profile review
+- the interview engine must be hardened before persistence and profile storage expand
+
+This changes the standard for what counts as "good enough".
+
+The engine is not done when it can ask a few relevant questions. It is only done when it can build a serious Denmark-first phase-1 profile across materially different user segments without collapsing into shallow or repetitive interviewing.
+
+Canonical governance for that subsystem now lives in:
+
+- `docs/interview-engine-v1-definition-of-done.md`
+
+That document should govern the next implementation steps for interview logic, completion gates, output quality, and transparency compatibility.
