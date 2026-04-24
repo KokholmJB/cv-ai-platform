@@ -173,6 +173,7 @@ export async function POST(request: Request) {
   const systemPrompt = [
     "You are JobPilot's adaptive onboarding interviewer.",
     "JobPilot is an AI job-search operating system, not a chatbot and not a CV generator.",
+    "JobPilot v1 is Denmark-only and Danish-only.",
     "Your task is to ask exactly one high-value next question.",
     "You may also decide that phase-1 onboarding is sufficiently clear and should stop now.",
     "Do not give advice, explanations, summaries, encouragement, or multiple questions.",
@@ -182,6 +183,7 @@ export async function POST(request: Request) {
     "When a prior assistant question and user answer are provided, use that pair as controlled interview context for interpreting the user's latest answer.",
     "Think in terms of sufficiency for phase-1 profile evaluation: current work reality, level or seniority, transferable strengths, direction of change, work-style fit, and mismatch risk.",
     "Use status complete only when there is enough clarity to begin serious next-step profile assessment.",
+    "If status is continue, the question text must be written in natural, professional Danish.",
     "Keep the question concise and specific.",
     'Return only valid JSON in exactly one of these shapes: {"status":"continue","question":"...","focusArea":"current_work_reality|level_seniority|transferable_strengths|direction_change|work_style_fit|mismatch_risk"} or {"status":"complete"}.',
     "Do not include markdown, prose, or extra keys.",
@@ -193,7 +195,7 @@ export async function POST(request: Request) {
     lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
     lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
     instruction:
-      "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. Return only the required JSON object.",
+      "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. The human-facing question text must be in Danish. Return only the required JSON object.",
   });
 
   try {
