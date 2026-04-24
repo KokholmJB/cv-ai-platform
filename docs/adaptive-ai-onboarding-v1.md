@@ -899,7 +899,81 @@ Implementation implication:
 - later job-fit and generation flows should follow the same pattern
 - backend routes should continue to enforce structured input and structured output
 
-## 10. Phase-1 scope boundary
+## 10. Transparency And Data Rights Model
+
+JobPilot v1 must be designed around transparent handling of user profile data before persistence becomes a core product layer. This is a Denmark-first, GDPR-oriented product and architecture requirement. It is not a claim of legal completeness. It is a hard design constraint for how profile and storage work should evolve.
+
+### Transparency model
+
+JobPilot must expose user data in two separate layers:
+
+- `User Profile Data`: direct information the user has provided or explicitly edited
+- `AI Profile Core`: structured interpretation, summary, and derived profile elements generated from onboarding interview signals and later analysis
+
+These layers must remain distinct in architecture and storage design.
+
+Implications:
+
+- user-provided fields should remain traceable as direct input
+- AI-derived fields should remain traceable as derived interpretation
+- the system should not blur raw user statements and AI conclusions into one opaque profile blob
+- later UI should be able to display both layers separately
+
+### User rights and product requirements
+
+The architecture must support that the user can later:
+
+- view stored user profile data
+- view the AI-generated profile core
+- edit or correct profile data
+- request deletion or removal of profile data
+- remove AI-generated profile elements that should no longer be retained
+- export relevant profile data in a structured format
+
+This requirement applies even if the full user-facing controls are not built in v1.
+
+Architecture implication:
+
+- profile storage design must support selective read, update, deletion, and export
+- AI-derived profile elements should be stored in a way that allows them to be removed or regenerated independently
+- persistence should not assume that profile data is append-only or permanently retained
+
+### Privacy and trust principles
+
+JobPilot should be designed for:
+
+- privacy by design
+- data minimisation
+- explicit separation between user-provided data and AI-derived data
+- controlled access to sensitive profile information
+- no public exposure of profile data
+- strong protection of stored personal data
+- readiness for encryption and access-control in storage design
+- retention rules that avoid keeping unnecessary personal data forever
+
+Technical implication:
+
+- persistence should store only the minimum required to support onboarding continuity, profile evaluation, and later user rights
+- sensitive profile data should be treated as protected application data, not generic analytics payload
+- storage design should assume future encryption and role-based access requirements even if those controls are not yet implemented
+- retention should become an explicit part of storage design, not an afterthought
+
+### Build-order rule
+
+The full data-rights UI is not being built right now.
+
+However:
+
+- persistence and database work must not begin without this transparency and data-rights model being accounted for
+- transparent user access, edit, delete, and export support becomes a required phase before broad production scaling
+
+This means:
+
+- early persistence work must be compatible with later user rights
+- storage shortcuts that make selective deletion, correction, or export impractical should be avoided
+- profile architecture must be designed for transparency before it is designed for scale
+
+## 11. Phase-1 scope boundary
 
 What belongs in v1:
 
@@ -929,7 +1003,7 @@ What should wait:
 
 V1 should not try to fully understand the person as a human being. It should understand the person well enough as a job-search actor to improve decisions, personalization, and continuity.
 
-## 11. Recommended next implementation step
+## 12. Recommended next implementation step
 
 The next single safest technical step is:
 

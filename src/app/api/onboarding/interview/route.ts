@@ -8,9 +8,11 @@ const allowedFocusAreas = [
   "mismatch_risk",
 ] as const;
 const allowedStatuses = ["continue", "complete"] as const;
+const allowedConfidenceLevels = ["low", "medium", "high"] as const;
 
 type FocusArea = (typeof allowedFocusAreas)[number];
 type InterviewStatus = (typeof allowedStatuses)[number];
+type ConfidenceLevel = (typeof allowedConfidenceLevels)[number];
 
 type ProfileDraft = {
   name?: string;
@@ -72,6 +74,133 @@ function isFocusArea(value: unknown): value is FocusArea {
 
 function isInterviewStatus(value: unknown): value is InterviewStatus {
   return typeof value === "string" && allowedStatuses.includes(value as InterviewStatus);
+}
+
+function isConfidenceLevel(value: unknown): value is ConfidenceLevel {
+  return typeof value === "string" && allowedConfidenceLevels.includes(value as ConfidenceLevel);
+}
+
+function toNullableShortString(value: unknown, maxLength = 300) {
+  if (value === null) {
+    return null;
+  }
+
+  return isShortString(value, maxLength) ? value.trim() : null;
+}
+
+function isStringArray(value: unknown, maxItems = 10, maxLength = 200): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= maxItems &&
+    value.every((item) => typeof item === "string" && item.trim().length > 0 && item.trim().length <= maxLength)
+  );
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getMeaningfulTokens(value: string) {
+  const stopWords = new Set([
+    "hvad",
+    "hvilken",
+    "hvilke",
+    "hvordan",
+    "hvorfor",
+    "vil",
+    "du",
+    "dig",
+    "din",
+    "dit",
+    "de",
+    "det",
+    "der",
+    "for",
+    "med",
+    "mest",
+    "mod",
+    "eller",
+    "som",
+    "til",
+    "lige",
+    "nu",
+    "gerne",
+    "helst",
+    "vaere",
+    "blive",
+    "arbejder",
+    "rolle",
+  ]);
+
+  return normalizeText(value)
+    .split(" ")
+    .filter((token) => token.length > 2 && !stopWords.has(token));
+}
+
+function inferFocusAreaFromQuestion(question: string): FocusArea | null {
+  const normalized = normalizeText(question);
+
+  const keywordMap: Record<FocusArea, string[]> = {
+    current_work_reality: ["nuvaerende", "hverdag", "arbejde", "arbejder", "ansvar", "opgaver", "processer", "produkter", "mennesker"],
+    level_seniority: ["senior", "niveau", "ansvar", "ledelse", "beslutninger", "scope", "leder", "erfaren"],
+    transferable_strengths: ["styrker", "kompetencer", "erfaring", "overforbare", "transferable", "stolt", "resultater"],
+    direction_change: ["naeste", "skridt", "retning", "produktleder", "projektleder", "udvikle", "skifte", "onsker"],
+    work_style_fit: ["arbejdsmiljo", "arbejdsmiljoe", "trives", "ambiguity", "uklarhed", "struktur", "tempo", "samarbejde"],
+    mismatch_risk: ["bekymring", "risiko", "udfordring", "mismatch", "ikke", "blokere", "hindre"],
+  };
+
+  let bestMatch: { focusArea: FocusArea; score: number } | null = null;
+
+  for (const [focusArea, keywords] of Object.entries(keywordMap) as [FocusArea, string[]][]) {
+    const score = keywords.reduce((count, keyword) => (normalized.includes(keyword) ? count + 1 : count), 0);
+
+    if (score === 0) {
+      continue;
+    }
+
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { focusArea, score };
+    }
+  }
+
+  return bestMatch?.focusArea ?? null;
+}
+
+function areQuestionsTooSimilar(previousQuestion: string, nextQuestion: string) {
+  const previousNormalized = normalizeText(previousQuestion);
+  const nextNormalized = normalizeText(nextQuestion);
+
+  if (!previousNormalized || !nextNormalized) {
+    return false;
+  }
+
+  if (previousNormalized === nextNormalized) {
+    return true;
+  }
+
+  const previousTokens = new Set(getMeaningfulTokens(previousQuestion));
+  const nextTokens = new Set(getMeaningfulTokens(nextQuestion));
+
+  if (previousTokens.size === 0 || nextTokens.size === 0) {
+    return false;
+  }
+
+  let overlap = 0;
+
+  for (const token of previousTokens) {
+    if (nextTokens.has(token)) {
+      overlap += 1;
+    }
+  }
+
+  const overlapRatio = overlap / Math.min(previousTokens.size, nextTokens.size);
+  return overlapRatio >= 0.6;
 }
 
 export async function POST(request: Request) {
@@ -181,11 +310,16 @@ export async function POST(request: Request) {
     "Ask one concrete question that reduces uncertainty about work reality, level, transferable strengths, direction of change, work-style fit, or mismatch risk.",
     "If information is missing, prioritize the highest-value clarification.",
     "When a prior assistant question and user answer are provided, use that pair as controlled interview context for interpreting the user's latest answer.",
+    "Do not repeat the same clarification if the latest user answer already resolves it sufficiently for phase 1.",
+    "If the latest answer has already clarified the active uncertainty, either move to a different unresolved area or return status complete.",
+    "Repeated direction-of-change questions are a sign to stop if the user's direction is already clear enough for phase 1.",
     "Think in terms of sufficiency for phase-1 profile evaluation: current work reality, level or seniority, transferable strengths, direction of change, work-style fit, and mismatch risk.",
     "Use status complete only when there is enough clarity to begin serious next-step profile assessment.",
     "If status is continue, the question text must be written in natural, professional Danish.",
+    "If status is complete, return a concise structured phase-1 profile summary.",
+    "For status complete, separate user-provided profile data from AI-derived profile core.",
     "Keep the question concise and specific.",
-    'Return only valid JSON in exactly one of these shapes: {"status":"continue","question":"...","focusArea":"current_work_reality|level_seniority|transferable_strengths|direction_change|work_style_fit|mismatch_risk"} or {"status":"complete"}.',
+    'Return only valid JSON in exactly one of these shapes: {"status":"continue","question":"...","focusArea":"current_work_reality|level_seniority|transferable_strengths|direction_change|work_style_fit|mismatch_risk"} or {"status":"complete","profileSummary":{"userProfileData":{"name":string|null,"currentRole":string|null,"yearsExperience":string|null,"targetDirection":string|null},"aiProfileCore":{"currentWorkReality":string,"levelSeniority":string,"transferableStrengths":string[],"directionOfChange":string,"workStyleFit":string,"mismatchRisks":string[],"confidence":"low"|"medium"|"high"}}}.',
     "Do not include markdown, prose, or extra keys.",
   ].join(" ");
 
@@ -195,7 +329,7 @@ export async function POST(request: Request) {
     lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
     lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
     instruction:
-      "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. The human-facing question text must be in Danish. Return only the required JSON object.",
+      "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. The human-facing question text must be in Danish. If complete, return the structured phase-1 profile summary. Return only the required JSON object.",
   });
 
   try {
@@ -266,9 +400,84 @@ export async function POST(request: Request) {
     }
 
     if (status === "complete") {
+      const profileSummary = result.profileSummary;
+
+      if (!profileSummary || typeof profileSummary !== "object" || Array.isArray(profileSummary)) {
+        return Response.json({
+          ok: false,
+          error: "Invalid profile summary.",
+        });
+      }
+
+      const summary = profileSummary as Record<string, unknown>;
+      const userProfileData = summary.userProfileData;
+      const aiProfileCore = summary.aiProfileCore;
+
+      if (!userProfileData || typeof userProfileData !== "object" || Array.isArray(userProfileData)) {
+        return Response.json({
+          ok: false,
+          error: "Invalid user profile data.",
+        });
+      }
+
+      if (!aiProfileCore || typeof aiProfileCore !== "object" || Array.isArray(aiProfileCore)) {
+        return Response.json({
+          ok: false,
+          error: "Invalid AI profile core.",
+        });
+      }
+
+      const userData = userProfileData as Record<string, unknown>;
+      const aiCore = aiProfileCore as Record<string, unknown>;
+
+      const normalizedUserProfileData = {
+        name: toNullableShortString(userData.name),
+        currentRole: toNullableShortString(userData.currentRole),
+        yearsExperience: toNullableShortString(userData.yearsExperience),
+        targetDirection: toNullableShortString(userData.targetDirection),
+      };
+
+      const currentWorkReality = toNullableShortString(aiCore.currentWorkReality);
+      const levelSeniority = toNullableShortString(aiCore.levelSeniority);
+      const directionOfChange = toNullableShortString(aiCore.directionOfChange);
+      const workStyleFit = toNullableShortString(aiCore.workStyleFit);
+
+      if (!currentWorkReality || !levelSeniority || !directionOfChange || !workStyleFit) {
+        return Response.json({
+          ok: false,
+          error: "Invalid AI profile core.",
+        });
+      }
+
+      if (!isStringArray(aiCore.transferableStrengths) || !isStringArray(aiCore.mismatchRisks)) {
+        return Response.json({
+          ok: false,
+          error: "Invalid AI profile arrays.",
+        });
+      }
+
+      if (!isConfidenceLevel(aiCore.confidence)) {
+        return Response.json({
+          ok: false,
+          error: "Invalid confidence level.",
+        });
+      }
+
       return Response.json({
         ok: true,
         status,
+        profileSummary: {
+          userProfileData: normalizedUserProfileData,
+          aiProfileCore: {
+            currentWorkReality,
+            levelSeniority,
+            transferableStrengths: aiCore.transferableStrengths.map((item) => item.trim()),
+            directionOfChange,
+            workStyleFit,
+            mismatchRisks: aiCore.mismatchRisks.map((item) => item.trim()),
+            confidence: aiCore.confidence,
+          },
+        },
       });
     }
 
@@ -286,6 +495,20 @@ export async function POST(request: Request) {
       return Response.json({
         ok: false,
         error: "Invalid focus area.",
+      });
+    }
+
+    const priorFocusArea =
+      typeof lastAssistantQuestion === "string" ? inferFocusAreaFromQuestion(lastAssistantQuestion) : null;
+
+    if (
+      typeof lastAssistantQuestion === "string" &&
+      priorFocusArea === focusArea &&
+      areQuestionsTooSimilar(lastAssistantQuestion, question)
+    ) {
+      return Response.json({
+        ok: false,
+        error: "Repeated interview question.",
       });
     }
 

@@ -49,6 +49,35 @@ The onboarding system is expected to eventually support:
 - usage should later be tracked by feature
 - operating principle: quality-first, spend-controlled
 
+## Transparency And Data Rights Requirement
+
+Transparent profile data handling is now a confirmed product requirement.
+
+JobPilot must later expose profile information in two separate layers:
+
+- `User Profile Data`: direct user-provided or user-edited profile information
+- `AI Profile Core`: AI-derived structured interpretation and summary
+
+The architecture must support that the user can later:
+
+- view stored profile data
+- view the AI-generated profile core
+- edit or correct profile data
+- request deletion or removal of profile data
+- remove AI-generated profile elements that should no longer be retained
+- export relevant profile data in a structured format
+
+This is not implemented yet.
+
+It must be addressed before persistence and broader storage design are treated as complete.
+
+Additional design implications:
+
+- user-provided data and AI-derived data should remain explicitly separate
+- persistence should follow privacy-by-design and data-minimisation principles
+- storage design should be ready for encryption and access-control later
+- retention should be treated as a real storage concern, not a future cleanup task
+
 ## Verified Technical Status
 
 - the setup flow is live on production
@@ -73,6 +102,7 @@ The following are not built yet:
 
 - no persistence yet
 - no database yet
+- no transparent profile access, edit, delete, or export flow yet
 - no final profile schema output yet
 - no market intelligence refresh system yet
 - no real job-fit engine yet
