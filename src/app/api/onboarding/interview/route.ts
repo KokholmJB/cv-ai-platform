@@ -96,6 +96,41 @@ function isStringArray(value: unknown, maxItems = 10, maxLength = 200): value is
   );
 }
 
+function hasSubstantiveAnswer(value: string) {
+  return normalizeText(value).split(" ").filter(Boolean).length >= 6;
+}
+
+function hasDescriptiveDepth(value: string | null, minimumWords = 6) {
+  return Boolean(value && normalizeText(value).split(" ").filter(Boolean).length >= minimumWords);
+}
+
+function hasMeaningfulItems(value: string[], minimumItems: number, minimumWords = 1) {
+  const meaningfulCount = value.filter(
+    (item) => normalizeText(item).split(" ").filter(Boolean).length >= minimumWords,
+  ).length;
+
+  return meaningfulCount >= minimumItems;
+}
+
+function hasDistinctVocabulary(values: string[], minimumUniqueTokens: number) {
+  const uniqueTokens = new Set(
+    values.flatMap((value) => getMeaningfulTokens(value)).filter((token) => token.length > 2),
+  );
+
+  return uniqueTokens.size >= minimumUniqueTokens;
+}
+
+function looksTemplateLike(values: string[]) {
+  const normalizedValues = values.map((value) => normalizeText(value)).filter(Boolean);
+
+  if (normalizedValues.length === 0) {
+    return true;
+  }
+
+  const uniqueValues = new Set(normalizedValues);
+  return uniqueValues.size <= Math.max(1, Math.floor(normalizedValues.length / 2));
+}
+
 function normalizeText(value: string) {
   return value
     .toLowerCase()
@@ -201,6 +236,129 @@ function areQuestionsTooSimilar(previousQuestion: string, nextQuestion: string) 
 
   const overlapRatio = overlap / Math.min(previousTokens.size, nextTokens.size);
   return overlapRatio >= 0.6;
+}
+
+function isProfileSummarySufficientForPhase1({
+  profileSummary,
+  lastAssistantQuestion,
+  lastUserAnswer,
+}: {
+  profileSummary: {
+    userProfileData: {
+      name: string | null;
+      currentRole: string | null;
+      yearsExperience: string | null;
+      targetDirection: string | null;
+    };
+    aiProfileCore: {
+      currentWorkReality: string;
+      levelSeniority: string;
+      transferableStrengths: string[];
+      directionOfChange: string;
+      workStyleFit: string;
+      mismatchRisks: string[];
+      confidence: ConfidenceLevel;
+    };
+  };
+  lastAssistantQuestion: string | null;
+  lastUserAnswer: string | null;
+}) {
+  if (!lastAssistantQuestion || !lastUserAnswer) {
+    return false;
+  }
+
+  if (!hasSubstantiveAnswer(lastUserAnswer)) {
+    return false;
+  }
+
+  const populatedUserFields = [
+    profileSummary.userProfileData.name,
+    profileSummary.userProfileData.currentRole,
+    profileSummary.userProfileData.yearsExperience,
+    profileSummary.userProfileData.targetDirection,
+  ].filter((value) => typeof value === "string" && value.trim().length > 0).length;
+
+  if (populatedUserFields < 2) {
+    return false;
+  }
+
+  const aiCore = profileSummary.aiProfileCore;
+
+  if (
+    !hasDescriptiveDepth(aiCore.currentWorkReality, 7) ||
+    !hasDescriptiveDepth(aiCore.levelSeniority, 6) ||
+    !hasDescriptiveDepth(aiCore.directionOfChange, 6) ||
+    !hasDescriptiveDepth(aiCore.workStyleFit, 6)
+  ) {
+    return false;
+  }
+
+  if (
+    !hasMeaningfulItems(aiCore.transferableStrengths, 3, 1) ||
+    !hasMeaningfulItems(aiCore.mismatchRisks, 2, 3)
+  ) {
+    return false;
+  }
+
+  if (!isConfidenceLevel(aiCore.confidence)) {
+    return false;
+  }
+
+  const narrativeFields = [
+    aiCore.currentWorkReality,
+    aiCore.levelSeniority,
+    aiCore.directionOfChange,
+    aiCore.workStyleFit,
+  ];
+
+  if (
+    looksTemplateLike(narrativeFields) ||
+    !hasDistinctVocabulary(narrativeFields, 12) ||
+    !hasDistinctVocabulary(aiCore.transferableStrengths, 4) ||
+    !hasDistinctVocabulary(aiCore.mismatchRisks, 5)
+  ) {
+    return false;
+  }
+
+  const priorFocusArea = inferFocusAreaFromQuestion(lastAssistantQuestion);
+  const distinctCoverageSignals = [
+    hasDescriptiveDepth(aiCore.currentWorkReality, 7),
+    hasDescriptiveDepth(aiCore.levelSeniority, 6),
+    hasDescriptiveDepth(aiCore.directionOfChange, 6),
+    hasDescriptiveDepth(aiCore.workStyleFit, 6),
+    hasMeaningfulItems(aiCore.transferableStrengths, 3, 1),
+    hasMeaningfulItems(aiCore.mismatchRisks, 2, 3),
+  ].filter(Boolean).length;
+
+  if (distinctCoverageSignals < 5) {
+    return false;
+  }
+
+  if (
+    priorFocusArea === "direction_change" &&
+    (!hasDescriptiveDepth(aiCore.currentWorkReality, 7) ||
+      !hasDescriptiveDepth(aiCore.levelSeniority, 6) ||
+      !hasDescriptiveDepth(aiCore.workStyleFit, 6) ||
+      !hasMeaningfulItems(aiCore.mismatchRisks, 2, 3))
+  ) {
+    return false;
+  }
+
+  const normalizedDirection = normalizeText(aiCore.directionOfChange);
+  const normalizedReality = normalizeText(aiCore.currentWorkReality);
+  const normalizedStyleFit = normalizeText(aiCore.workStyleFit);
+
+  if (
+    normalizedDirection &&
+    (normalizedDirection === normalizedReality ||
+      normalizedDirection === normalizedStyleFit ||
+      areQuestionsTooSimilar(aiCore.directionOfChange, aiCore.currentWorkReality) ||
+      areQuestionsTooSimilar(aiCore.directionOfChange, aiCore.workStyleFit))
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export async function POST(request: Request) {
@@ -463,21 +621,36 @@ export async function POST(request: Request) {
         });
       }
 
+      const normalizedProfileSummary = {
+        userProfileData: normalizedUserProfileData,
+        aiProfileCore: {
+          currentWorkReality,
+          levelSeniority,
+          transferableStrengths: aiCore.transferableStrengths.map((item) => item.trim()),
+          directionOfChange,
+          workStyleFit,
+          mismatchRisks: aiCore.mismatchRisks.map((item) => item.trim()),
+          confidence: aiCore.confidence,
+        },
+      };
+
+      if (
+        !isProfileSummarySufficientForPhase1({
+          profileSummary: normalizedProfileSummary,
+          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
+          lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+        })
+      ) {
+        return Response.json({
+          ok: false,
+          error: "Profile summary is not sufficient.",
+        });
+      }
+
       return Response.json({
         ok: true,
         status,
-        profileSummary: {
-          userProfileData: normalizedUserProfileData,
-          aiProfileCore: {
-            currentWorkReality,
-            levelSeniority,
-            transferableStrengths: aiCore.transferableStrengths.map((item) => item.trim()),
-            directionOfChange,
-            workStyleFit,
-            mismatchRisks: aiCore.mismatchRisks.map((item) => item.trim()),
-            confidence: aiCore.confidence,
-          },
-        },
+        profileSummary: normalizedProfileSummary,
       });
     }
 

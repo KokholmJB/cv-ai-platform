@@ -42,24 +42,44 @@ type SetupFormState = {
   };
 };
 
+type ConfidenceLevel = "low" | "medium" | "high";
+
+type ProfileSummary = {
+  userProfileData: {
+    name: string | null;
+    currentRole: string | null;
+    yearsExperience: string | null;
+    targetDirection: string | null;
+  };
+  aiProfileCore: {
+    currentWorkReality: string;
+    levelSeniority: string;
+    transferableStrengths: string[];
+    directionOfChange: string;
+    workStyleFit: string;
+    mismatchRisks: string[];
+    confidence: ConfidenceLevel;
+  };
+};
+
 type InterviewResult =
   | {
       status: "idle";
-      message: null;
       question: null;
       focusArea: null;
+      profileSummary: null;
     }
   | {
       status: "continue";
-      message: null;
       question: string;
       focusArea: string;
+      profileSummary: null;
     }
   | {
       status: "complete";
-      message: string;
       question: null;
       focusArea: null;
+      profileSummary: ProfileSummary;
     };
 
 const steps: { id: StepId; label: string; eyebrow: string; title: string }[] = [
@@ -195,14 +215,29 @@ function ProgressPill({
   );
 }
 
+function formatMaybeValue(value: string | null) {
+  return value && value.trim().length > 0 ? value : "Ikke angivet endnu";
+}
+
+function formatConfidenceLabel(confidence: ConfidenceLevel) {
+  switch (confidence) {
+    case "high":
+      return "Høj";
+    case "medium":
+      return "Mellem";
+    case "low":
+      return "Lav";
+  }
+}
+
 export function SetupFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formState, setFormState] = useState<SetupFormState>(initialState);
   const [interviewResult, setInterviewResult] = useState<InterviewResult>({
     status: "idle",
-    message: null,
     question: null,
     focusArea: null,
+    profileSummary: null,
   });
   const [interviewAnswer, setInterviewAnswer] = useState("");
   const [interviewErrorMessage, setInterviewErrorMessage] = useState<string | null>(null);
@@ -288,6 +323,7 @@ export function SetupFlow() {
         | {
             ok: true;
             status: "complete";
+            profileSummary: ProfileSummary;
           }
         | {
             ok: false;
@@ -302,9 +338,9 @@ export function SetupFlow() {
       if (data.status === "complete") {
         setInterviewResult({
           status: "complete",
-          message: "JobPilot har nok information til fase 1 og kan gå videre til profilvurdering.",
           question: null,
           focusArea: null,
+          profileSummary: data.profileSummary,
         });
         setInterviewAnswer("");
         return;
@@ -312,9 +348,9 @@ export function SetupFlow() {
 
       setInterviewResult({
         status: "continue",
-        message: null,
         question: data.question,
         focusArea: data.focusArea,
+        profileSummary: null,
       });
       setInterviewAnswer("");
     } catch {
@@ -341,6 +377,61 @@ export function SetupFlow() {
     }
 
     await requestInterviewTurn(interviewResult.question, trimmedAnswer);
+  }
+
+  function renderCompleteSummary(profileSummary: ProfileSummary) {
+    return (
+      <div className="mt-6 space-y-5">
+        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Fase 1 færdig
+          </p>
+          <p className="mt-3 text-sm leading-7 text-slate-700">
+            JobPilot har nu nok information til en første profilvurdering.
+          </p>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SummaryCard
+            title="Dine profiloplysninger"
+            items={[
+              ["Navn", formatMaybeValue(profileSummary.userProfileData.name)],
+              ["Nuværende rolle", formatMaybeValue(profileSummary.userProfileData.currentRole)],
+              ["Erfaring", formatMaybeValue(profileSummary.userProfileData.yearsExperience)],
+              ["Ønsket retning", formatMaybeValue(profileSummary.userProfileData.targetDirection)],
+            ]}
+          />
+          <SummaryCard
+            title="JobPilots profilvurdering"
+            items={[
+              ["Nuværende arbejdssituation", profileSummary.aiProfileCore.currentWorkReality],
+              ["Niveau og senioritet", profileSummary.aiProfileCore.levelSeniority],
+              ["Retning for skift", profileSummary.aiProfileCore.directionOfChange],
+              ["Arbejdsstil og match", profileSummary.aiProfileCore.workStyleFit],
+              ["Sikkerhedsniveau", formatConfidenceLabel(profileSummary.aiProfileCore.confidence)],
+            ]}
+          />
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SummaryCard
+            title="Overførbare styrker"
+            items={profileSummary.aiProfileCore.transferableStrengths.map((item, index) => [
+              `Styrke ${index + 1}`,
+              item,
+            ])}
+          />
+          <SummaryCard
+            title="Mulige mismatch-risici"
+            items={
+              profileSummary.aiProfileCore.mismatchRisks.length > 0
+                ? profileSummary.aiProfileCore.mismatchRisks.map((item, index) => [`Risiko ${index + 1}`, item])
+                : [["Status", "Ingen tydelige mismatch-risici markeret i fase 1."]]
+            }
+          />
+        </div>
+      </div>
+    );
   }
 
   function renderInterviewPanel() {
@@ -395,11 +486,9 @@ export function SetupFlow() {
           </div>
         ) : null}
 
-        {interviewResult.status === "complete" ? (
-          <div className="mt-6 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm leading-7 text-slate-700">{interviewResult.message}</p>
-          </div>
-        ) : null}
+        {interviewResult.status === "complete" && interviewResult.profileSummary
+          ? renderCompleteSummary(interviewResult.profileSummary)
+          : null}
 
         {interviewErrorMessage ? (
           <div className="mt-6 rounded-[1.25rem] border border-rose-200 bg-rose-50 p-5">
