@@ -73,6 +73,18 @@ This must be addressed before the interview engine can be considered done by the
 - interview questions should avoid English career jargon and internal HR or product language unless the user's own profile clearly justifies it
 - broader coverage beyond role, level, strengths, and direction remains part of the active interview-engine hardening work
 - the engine still needs stronger balanced coverage of branch or domain context, evidence depth, concrete cases or results, motivation or no-go conditions, and profile-strength-versus-goal-level
+- interviewState and completion hardening now include broader coverage dimensions such as domain context, no-go clarity, and profile-strength-gap signals
+- completion now requires broader coverage than before, not mainly role, level, and direction
+- interview flow reliability hardening is now implemented
+- backend now retries certain recoverable interview-generation failures internally before returning an error
+- frontend now prevents duplicate rapid-fire submits while an interview request is already in flight
+- local and dev interview testing now exposes backend `reasonCode` for failed interview-generation attempts
+- this is a temporary hardening aid for debugging interview reliability
+- production still keeps user-facing messaging simple
+- dev mode now also exposes retry exhaustion details such as the last failure reason and a compact retry trail
+- low-quality-answer handling has been added as a controlled fallback before model retries are used
+- low-quality-answer handling was too aggressive and is now being narrowed to true filler or junk detection only
+- substantive Danish answers with real work, domain, responsibility, or motivation detail should now pass the guard
 
 ## Interview Progress And Resume Requirement
 
@@ -158,10 +170,12 @@ Additional design implications:
 - it includes a simple repetition guard against near-duplicate same-focus follow-up questions
 - the `/setup` UI can start the interview, continue one additional turn, and render the completed phase-1 profile summary
 - interview state is currently carried only within the active frontend session
+- failed interview generation now returns a compact `reasonCode` after internal retries are exhausted
 - it does not yet persist interview state
 - it does not yet satisfy the stricter coverage, completion-gate, and segment-robustness requirements defined for Interview Engine v1
 - it does not yet account for uploaded or pre-collected evidence quality as part of interview sufficiency
 - plain-Danish wording and broader coverage balancing are now part of the active interview-engine hardening work
+- document and evidence-aware intake is still not implemented
 
 ## Explicit Boundaries
 

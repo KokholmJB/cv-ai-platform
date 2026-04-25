@@ -43,6 +43,44 @@ type SetupFormState = {
 };
 
 type ConfidenceLevel = "low" | "medium" | "high";
+type FocusArea =
+  | "current_work_reality"
+  | "level_seniority"
+  | "transferable_strengths"
+  | "direction_change"
+  | "work_style_fit"
+  | "mismatch_risk";
+
+type InterviewCoverage = {
+  currentWorkReality: boolean;
+  levelSeniority: boolean;
+  transferableStrengths: boolean;
+  directionOfChange: boolean;
+  workStyleFit: boolean;
+  mismatchRisk: boolean;
+  evidenceDepth: boolean;
+  motivationFit: boolean;
+  domainContext: boolean;
+  noGoClarity: boolean;
+  profileStrengthGap: boolean;
+};
+
+type InterviewState = {
+  answeredTurns: number;
+  coveredFocusAreas: FocusArea[];
+  coverage: InterviewCoverage;
+};
+
+type InterviewReasonCode =
+  | "INVALID_MODEL_JSON"
+  | "REPEATED_QUESTION"
+  | "INSUFFICIENT_COVERAGE"
+  | "INVALID_PROFILE_SUMMARY"
+  | "INVALID_MODEL_OUTPUT"
+  | "INVALID_PLAIN_DANISH"
+  | "LOW_QUALITY_ANSWER"
+  | "OPENAI_REQUEST_FAILED"
+  | "RETRY_EXHAUSTED";
 
 type ProfileSummary = {
   userProfileData: {
@@ -72,7 +110,7 @@ type InterviewResult =
   | {
       status: "continue";
       question: string;
-      focusArea: string;
+      focusArea: FocusArea;
       profileSummary: null;
     }
   | {
@@ -173,6 +211,24 @@ const initialState: SetupFormState = {
   },
 };
 
+const emptyInterviewState: InterviewState = {
+  answeredTurns: 0,
+  coveredFocusAreas: [],
+  coverage: {
+    currentWorkReality: false,
+    levelSeniority: false,
+    transferableStrengths: false,
+    directionOfChange: false,
+    workStyleFit: false,
+    mismatchRisk: false,
+    evidenceDepth: false,
+    motivationFit: false,
+    domainContext: false,
+    noGoClarity: false,
+    profileStrengthGap: false,
+  },
+};
+
 function ProgressPill({
   active,
   completed,
@@ -230,6 +286,26 @@ function formatConfidenceLabel(confidence: ConfidenceLevel) {
   }
 }
 
+function getInterviewErrorMessage(reasonCode?: InterviewReasonCode) {
+  switch (reasonCode) {
+    case "LOW_QUALITY_ANSWER":
+      return "Svaret er for kort eller uklart til at føre interviewet videre.";
+    case "INSUFFICIENT_COVERAGE":
+      return "JobPilot mangler stadig nok afklaring til at gå videre. Prøv et mere konkret svar.";
+    case "RETRY_EXHAUSTED":
+    case "OPENAI_REQUEST_FAILED":
+      return "JobPilot kunne ikke hente næste spørgsmål lige nu. Prøv igen om et øjeblik.";
+    case "INVALID_MODEL_JSON":
+    case "INVALID_MODEL_OUTPUT":
+    case "INVALID_PROFILE_SUMMARY":
+    case "INVALID_PLAIN_DANISH":
+    case "REPEATED_QUESTION":
+      return "JobPilot kunne ikke lave et stabilt næste trin lige nu. Prøv igen.";
+    default:
+      return "JobPilot kunne ikke hente næste spørgsmål lige nu.";
+  }
+}
+
 export function SetupFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [formState, setFormState] = useState<SetupFormState>(initialState);
@@ -241,7 +317,11 @@ export function SetupFlow() {
   });
   const [interviewAnswer, setInterviewAnswer] = useState("");
   const [interviewErrorMessage, setInterviewErrorMessage] = useState<string | null>(null);
+  const [interviewErrorReasonCode, setInterviewErrorReasonCode] = useState<InterviewReasonCode | null>(null);
+  const [interviewLastFailureReasonCode, setInterviewLastFailureReasonCode] = useState<InterviewReasonCode | null>(null);
+  const [interviewRetryTrail, setInterviewRetryTrail] = useState<InterviewReasonCode[]>([]);
   const [isInterviewLoading, setIsInterviewLoading] = useState(false);
+  const [interviewState, setInterviewState] = useState<InterviewState>(emptyInterviewState);
 
   const progressValue = useMemo(
     () => Math.round(((currentStep + 1) / steps.length) * 100),
@@ -291,8 +371,15 @@ export function SetupFlow() {
   }
 
   async function requestInterviewTurn(lastAssistantQuestion: string | null, lastUserAnswer: string | null) {
+    if (isInterviewLoading) {
+      return;
+    }
+
     setIsInterviewLoading(true);
     setInterviewErrorMessage(null);
+    setInterviewErrorReasonCode(null);
+    setInterviewLastFailureReasonCode(null);
+    setInterviewRetryTrail([]);
 
     try {
       const response = await fetch("/api/onboarding/interview", {
@@ -310,6 +397,7 @@ export function SetupFlow() {
           },
           lastAssistantQuestion,
           lastUserAnswer,
+          interviewState,
         }),
       });
 
@@ -318,24 +406,49 @@ export function SetupFlow() {
             ok: true;
             status: "continue";
             question: string;
-            focusArea: string;
+            focusArea: FocusArea;
+            interviewState: InterviewState;
           }
         | {
             ok: true;
             status: "complete";
             profileSummary: ProfileSummary;
+            interviewState: InterviewState;
           }
         | {
             ok: false;
             error?: string;
+            reasonCode?: InterviewReasonCode;
+            lastFailureReasonCode?: InterviewReasonCode;
+            retryTrail?: InterviewReasonCode[];
           };
 
       if (!response.ok || !data.ok) {
-        setInterviewErrorMessage("Kunne ikke hente næste spørgsmål lige nu.");
+        const reasonCode = data.ok ? undefined : data.reasonCode;
+        const lastFailureReasonCode = data.ok ? undefined : data.lastFailureReasonCode;
+        const retryTrail = data.ok ? undefined : data.retryTrail;
+
+        if (process.env.NODE_ENV !== "production" && reasonCode) {
+          console.debug("[interview] failure reasonCode:", reasonCode);
+        }
+
+        if (process.env.NODE_ENV !== "production" && lastFailureReasonCode) {
+          console.debug("[interview] lastFailureReasonCode:", lastFailureReasonCode);
+        }
+
+        if (process.env.NODE_ENV !== "production" && retryTrail?.length) {
+          console.debug("[interview] retryTrail:", retryTrail);
+        }
+
+        setInterviewErrorMessage(getInterviewErrorMessage(reasonCode));
+        setInterviewErrorReasonCode(reasonCode ?? null);
+        setInterviewLastFailureReasonCode(lastFailureReasonCode ?? null);
+        setInterviewRetryTrail(retryTrail ?? []);
         return;
       }
 
       if (data.status === "complete") {
+        setInterviewState(data.interviewState);
         setInterviewResult({
           status: "complete",
           question: null,
@@ -346,6 +459,7 @@ export function SetupFlow() {
         return;
       }
 
+      setInterviewState(data.interviewState);
       setInterviewResult({
         status: "continue",
         question: data.question,
@@ -354,18 +468,36 @@ export function SetupFlow() {
       });
       setInterviewAnswer("");
     } catch {
-      setInterviewErrorMessage("Kunne ikke hente næste spørgsmål lige nu.");
+      setInterviewErrorMessage(getInterviewErrorMessage("OPENAI_REQUEST_FAILED"));
+      setInterviewErrorReasonCode("OPENAI_REQUEST_FAILED");
+      setInterviewLastFailureReasonCode(null);
+      setInterviewRetryTrail([]);
     } finally {
       setIsInterviewLoading(false);
     }
   }
 
   async function startInterview() {
+    if (isInterviewLoading) {
+      return;
+    }
+
+    setInterviewErrorMessage(null);
+    setInterviewErrorReasonCode(null);
+    setInterviewLastFailureReasonCode(null);
+    setInterviewRetryTrail([]);
+    setInterviewState(emptyInterviewState);
+    setInterviewResult({
+      status: "idle",
+      question: null,
+      focusArea: null,
+      profileSummary: null,
+    });
     await requestInterviewTurn(null, null);
   }
 
   async function continueInterview() {
-    if (interviewResult.status !== "continue") {
+    if (interviewResult.status !== "continue" || isInterviewLoading) {
       return;
     }
 
@@ -373,6 +505,9 @@ export function SetupFlow() {
 
     if (!trimmedAnswer) {
       setInterviewErrorMessage("Skriv et kort svar for at fortsætte.");
+      setInterviewErrorReasonCode(null);
+      setInterviewLastFailureReasonCode(null);
+      setInterviewRetryTrail([]);
       return;
     }
 
@@ -493,6 +628,17 @@ export function SetupFlow() {
         {interviewErrorMessage ? (
           <div className="mt-6 rounded-[1.25rem] border border-rose-200 bg-rose-50 p-5">
             <p className="text-sm leading-7 text-rose-700">{interviewErrorMessage}</p>
+            {process.env.NODE_ENV !== "production" && interviewErrorReasonCode ? (
+              <div className="mt-2 space-y-1 text-xs font-medium uppercase tracking-[0.12em] text-rose-500">
+                <p>Teknisk kode: {interviewErrorReasonCode}</p>
+                {interviewLastFailureReasonCode ? (
+                  <p>Sidste fejlkode: {interviewLastFailureReasonCode}</p>
+                ) : null}
+                {interviewRetryTrail.length > 0 ? (
+                  <p>Retry-forløb: {interviewRetryTrail.join(" -> ")}</p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
