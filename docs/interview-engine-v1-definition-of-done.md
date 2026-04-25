@@ -532,7 +532,112 @@ The engine should not produce a strong-sounding profile conclusion when:
 
 In those cases it should either continue or complete with lower confidence and explicit unresolved implications.
 
-## 10. Segment Robustness Requirements
+## 10. Interview Progress Model
+
+The interview engine must later expose meaningful progress to the user.
+
+This must not be implemented as a naive question counter.
+
+Progress should eventually reflect:
+
+- coverage breadth across required profiling dimensions
+- evidence depth and proof quality
+- readiness for downstream use
+- remaining uncertainty
+
+Progress must be tied to profile quality, not only the number of questions already asked.
+
+This means:
+
+- a user should not appear "almost done" only because many questions have been asked
+- a user may be closer to usable completion if the profile has high-value coverage with good evidence
+- a user may still be early in progress if many answers exist but the evidence remains weak or narrow
+
+The progress model should eventually be able to distinguish between:
+
+- basic orientation gathered
+- minimum usable profile reached
+- stronger profile reached
+- important uncertainty still unresolved
+
+## 11. Minimum Usable Threshold Versus Stronger Profile
+
+The interview engine should later communicate at least two useful thresholds in user-facing product language.
+
+### Minimum usable threshold
+
+This is the point where JobPilot has enough information for:
+
+- reasonable job evaluation
+- initial profile help
+- early CV or application assistance with cautious confidence
+
+This should be framed to the user as meaning:
+
+- JobPilot can already help
+- the profile is usable
+- some later improvement is still possible
+
+### Stronger or optimal profile threshold
+
+This is the point where JobPilot has enough coverage and evidence quality to provide:
+
+- stronger targeting
+- stronger writing support
+- more confident profiling
+- less need for immediate follow-up clarification
+
+This should be framed to the user as meaning:
+
+- the profile is stronger
+- JobPilot can tailor output better
+- continuing the interview improved quality, not just completeness
+
+The product should not force users to think in internal system terms such as "coverage model" or "confidence layer". It should communicate usable versus stronger profile value in normal product language.
+
+## 12. Pause And Resume Requirement
+
+The interview engine must later support:
+
+- stopping mid-way
+- returning later
+- continuing from the current profiling state
+- eventually continuing across browser, device, and account sessions
+
+This is required because the serious interview model will be too long and too evidence-sensitive to assume every user finishes in one sitting.
+
+The current browser-session-only state is not sufficient for the long-term interview model.
+
+The engine should be treated as resumable work, not as a one-session wizard.
+
+## 13. Dependency On Persistence
+
+Pause and resume across closed browser sessions or across devices requires persistence-compatible interview state storage.
+
+This does not mean persistence should be built now.
+
+It does mean:
+
+- this becomes a required design gate before the interview UX can be considered complete
+- progress and resume design must be compatible with later transparent user data handling
+- interview state storage must later support user visibility, correction, deletion, and export compatibility where relevant
+
+The interview subsystem should therefore avoid design shortcuts that assume interview state is disposable or inaccessible once persistence is introduced.
+
+## 14. UX Principle
+
+The product should later avoid making the user feel trapped in a long interview.
+
+Instead, the interview UX should:
+
+- show meaningful progress
+- show when the profile is already usable
+- encourage continuation for higher-quality output
+- allow return later without losing work
+
+The product goal is not to maximize question count. The product goal is to improve profile quality while maintaining user trust and forward momentum.
+
+## 15. Segment Robustness Requirements
 
 The engine must work across very different user types. It must adapt what it probes and what it treats as risk.
 
@@ -693,7 +798,7 @@ Profiling risks:
 - aspirational target accepted as immediate fit
 - lack of proof ignored
 
-## 11. Question Strategy And Interview Behavior
+## 16. Question Strategy And Interview Behavior
 
 The engine must ask one question at a time. Every question must have a profiling purpose.
 
@@ -725,7 +830,7 @@ Bad question quality includes:
 - asking for broad life goals instead of job-search-relevant clarification
 - asking the user to repeat facts that are already clear from CV or setup material
 
-## 12. Downstream Relevance
+## 17. Downstream Relevance
 
 Evidence-aware profiling is required because later CV and application generation must be able to choose between:
 
@@ -749,7 +854,7 @@ If the interview engine does not understand what evidence exists and what eviden
 
 This is why document and evidence intake is part of the interview subsystem itself, not a separate decorative preprocessing step.
 
-## 13. Output Contract Requirements
+## 18. Output Contract Requirements
 
 The output contract must preserve two distinct layers.
 
@@ -797,7 +902,7 @@ Weak or insufficient summaries are unacceptable. Examples:
 - no clear distinction between current reality and desired direction
 - no signal of whether the profile is supported by task evidence, result evidence, case evidence, or transition evidence
 
-## 14. Transparency And User Trust Requirements
+## 19. Transparency And User Trust Requirements
 
 The interview subsystem must be compatible with later transparent profile handling.
 
@@ -815,7 +920,7 @@ Build-order implication:
 - future profile review UI should be able to show both profile layers clearly
 - future profile review must also be able to distinguish direct user data, derived profile interpretation, and evidence-backed support where relevant
 
-## 15. Denmark-First Boundary For Interview Engine v1
+## 20. Denmark-First Boundary For Interview Engine v1
 
 Done for v1 means:
 
@@ -836,7 +941,7 @@ Intentionally deferred:
 - multi-country market tuning
 - non-Danish interview variants
 
-## 16. Acceptance Test Matrix
+## 21. Acceptance Test Matrix
 
 ### Project manager moving toward product
 
@@ -893,7 +998,7 @@ Success means:
 - summary captures level credibly and flags any mismatch risk
 - if supporting material is too generic for the claimed level, the engine recognizes that and asks for stronger scope or impact evidence
 
-## 17. Explicit Non-Goals
+## 22. Explicit Non-Goals
 
 Interview Engine v1 does not need to solve:
 
@@ -910,16 +1015,17 @@ Interview Engine v1 does not need to solve:
 
 These are downstream or adjacent concerns. The engine's job in v1 is to produce a strong enough profile foundation for them.
 
-## 18. Recommended Build Sequence After This Spec
+## 23. Recommended Build Sequence After This Spec
 
 The correct next implementation order for the interview engine is:
 
 1. harden completion gates
 2. improve coverage rules so completion requires real breadth and depth
 3. add document and evidence intake awareness
-4. strengthen output quality and usefulness of the AI Profile Core
-5. improve UI transparency for completed profile output
-6. add transparent profile review capabilities
-7. only then prepare persistence-compatible storage design
+4. add progress and usable-versus-stronger-profile product thresholds
+5. strengthen output quality and usefulness of the AI Profile Core
+6. improve UI transparency for completed profile output
+7. add transparent profile review capabilities
+8. only then prepare persistence-compatible storage design and real pause-resume support
 
 Do not jump ahead to CV generation, job-fit engine expansion, or broad storage work before the interview engine meets this Definition of Done.

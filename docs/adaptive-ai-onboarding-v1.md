@@ -792,6 +792,73 @@ Follow-up should happen later when:
 
 Completion should later depend not only on enough answers, but also on sufficient evidence quality for the intended downstream use.
 
+## 6A. Interview Progress And Usable Thresholds
+
+As onboarding becomes longer and more serious, the product must later expose meaningful interview progress to the user.
+
+This should not be treated as a simple question counter.
+
+Progress should eventually reflect:
+
+- coverage breadth
+- evidence depth
+- readiness for downstream use
+- remaining uncertainty
+
+Progress must be tied to profile quality, not only question count.
+
+The product should later communicate at least two useful thresholds:
+
+- a minimum usable threshold where JobPilot has enough information for reasonable job evaluation and initial CV help
+- a stronger profile threshold where JobPilot can provide more confident targeting and stronger writing support
+
+This should be explained to the user in product language, not internal system language.
+
+The product should be able to say, in effect:
+
+- your profile is usable now
+- continuing will improve quality
+
+without forcing the user to finish the full interview in one sitting.
+
+## 6B. Pause And Resume Requirement
+
+The interview must later support:
+
+- stopping mid-way
+- returning later
+- continuing from the current profiling state
+- eventually continuing across browser, device, and account sessions
+
+The current browser-session-only state is not sufficient for the long-term serious interview model.
+
+This means pause and resume becomes a real product requirement, not optional convenience behavior.
+
+## 6C. Dependency On Persistence-Compatible State
+
+Pause and resume across closed browser sessions or devices requires persistence-compatible interview state storage.
+
+This does not mean persistence should be built now.
+
+It does mean:
+
+- interview UX cannot be considered complete without a persistence-compatible state model
+- progress and resume design must be compatible with later transparent user data handling
+- future persistence work must preserve inspectable interview state rather than introducing opaque resume state
+
+## 6D. UX Principle For Longer Interviews
+
+The product should avoid making the user feel trapped in a long interview.
+
+Instead, it should later:
+
+- show meaningful progress
+- show when the profile is already usable
+- encourage continuation for stronger output quality
+- allow return later without losing work
+
+This is important because the serious interview model is no longer a small onboarding form. It is becoming a core profiling workflow.
+
 ## 7. Market And Geography Principles
 
 JobPilot must separate stable user understanding from changing market understanding.

@@ -67,6 +67,27 @@ Current interview logic still works primarily from:
 
 This must be addressed before the interview engine can be considered done by the stricter Definition of Done.
 
+## Active Interview Hardening Notes
+
+- plain Danish wording is now an explicit interview-engine requirement
+- interview questions should avoid English career jargon and internal HR or product language unless the user's own profile clearly justifies it
+- broader coverage beyond role, level, strengths, and direction remains part of the active interview-engine hardening work
+- the engine still needs stronger balanced coverage of branch or domain context, evidence depth, concrete cases or results, motivation or no-go conditions, and profile-strength-versus-goal-level
+
+## Interview Progress And Resume Requirement
+
+Interview progress, pause and resume, and usable-versus-stronger-profile thresholds are now confirmed future interview-engine requirements.
+
+Current state:
+
+- interview state is still only held in active frontend or browser session memory
+- no pause or resume across a closed browser session exists yet
+- no pause or resume across browser, device, or account sessions exists yet
+- progress visualization is not implemented yet
+- usable-threshold versus stronger-profile UX is not implemented yet
+
+This is now a confirmed future interview-engine requirement and a build gate for the longer-term serious interview UX.
+
 ## Market And Geography Principles
 
 - stable user profile and changing market context must be separate inputs
@@ -136,9 +157,11 @@ Additional design implications:
 - it can return a structured `profileSummary` on completion
 - it includes a simple repetition guard against near-duplicate same-focus follow-up questions
 - the `/setup` UI can start the interview, continue one additional turn, and render the completed phase-1 profile summary
+- interview state is currently carried only within the active frontend session
 - it does not yet persist interview state
 - it does not yet satisfy the stricter coverage, completion-gate, and segment-robustness requirements defined for Interview Engine v1
 - it does not yet account for uploaded or pre-collected evidence quality as part of interview sufficiency
+- plain-Danish wording and broader coverage balancing are now part of the active interview-engine hardening work
 
 ## Explicit Boundaries
 
