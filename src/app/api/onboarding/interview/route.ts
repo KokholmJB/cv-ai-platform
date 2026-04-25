@@ -13,6 +13,16 @@ const allowedConfidenceLevels = ["low", "medium", "high"] as const;
 type FocusArea = (typeof allowedFocusAreas)[number];
 type InterviewStatus = (typeof allowedStatuses)[number];
 type ConfidenceLevel = (typeof allowedConfidenceLevels)[number];
+type ReasonCode =
+  | "INVALID_MODEL_JSON"
+  | "REPEATED_QUESTION"
+  | "INSUFFICIENT_COVERAGE"
+  | "INVALID_PROFILE_SUMMARY"
+  | "INVALID_MODEL_OUTPUT"
+  | "INVALID_PLAIN_DANISH"
+  | "LOW_QUALITY_ANSWER"
+  | "OPENAI_REQUEST_FAILED"
+  | "RETRY_EXHAUSTED";
 
 type ProfileDraft = {
   name?: string;
@@ -21,8 +31,94 @@ type ProfileDraft = {
   targetDirection?: string;
 };
 
+type InterviewCoverage = {
+  currentWorkReality: boolean;
+  levelSeniority: boolean;
+  transferableStrengths: boolean;
+  directionOfChange: boolean;
+  workStyleFit: boolean;
+  mismatchRisk: boolean;
+  evidenceDepth: boolean;
+  motivationFit: boolean;
+  domainContext: boolean;
+  noGoClarity: boolean;
+  profileStrengthGap: boolean;
+};
+
+type InterviewState = {
+  answeredTurns: number;
+  coveredFocusAreas: FocusArea[];
+  coverage: InterviewCoverage;
+};
+
+type ProfileSummary = {
+  userProfileData: {
+    name: string | null;
+    currentRole: string | null;
+    yearsExperience: string | null;
+    targetDirection: string | null;
+  };
+  aiProfileCore: {
+    currentWorkReality: string;
+    levelSeniority: string;
+    transferableStrengths: string[];
+    directionOfChange: string;
+    workStyleFit: string;
+    mismatchRisks: string[];
+    confidence: ConfidenceLevel;
+  };
+};
+
+type ErrorPayload = {
+  ok: false;
+  error: string;
+  reasonCode?: ReasonCode;
+  lastFailureReasonCode?: ReasonCode;
+  retryTrail?: ReasonCode[];
+  lowQualityReason?: string;
+};
+
+type GenerateSuccess =
+  | {
+      ok: true;
+      status: "continue";
+      question: string;
+      focusArea: FocusArea;
+      interviewState: InterviewState;
+    }
+  | {
+      ok: true;
+      status: "complete";
+      profileSummary: ProfileSummary;
+      interviewState: InterviewState;
+    };
+
+type GenerateFailure = {
+  ok: false;
+  error: string;
+  reasonCode: ReasonCode;
+  retryable: boolean;
+};
+
 function isShortString(value: unknown, maxLength = 300): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
+}
+
+function errorResponse(
+  error: string,
+  reasonCode?: ReasonCode,
+  debug?: { lastFailureReasonCode?: ReasonCode; retryTrail?: ReasonCode[]; lowQualityReason?: string },
+) {
+  const includeDebug = process.env.NODE_ENV !== "production";
+
+  return Response.json({
+    ok: false,
+    error,
+    ...(reasonCode ? { reasonCode } : {}),
+    ...(includeDebug && debug?.lastFailureReasonCode ? { lastFailureReasonCode: debug.lastFailureReasonCode } : {}),
+    ...(includeDebug && debug?.retryTrail?.length ? { retryTrail: debug.retryTrail } : {}),
+    ...(includeDebug && debug?.lowQualityReason ? { lowQualityReason: debug.lowQualityReason } : {}),
+  } satisfies ErrorPayload);
 }
 
 function extractOutputText(data: Record<string, unknown>) {
@@ -96,8 +192,221 @@ function isStringArray(value: unknown, maxItems = 10, maxLength = 200): value is
   );
 }
 
+function createEmptyInterviewState(): InterviewState {
+  return {
+    answeredTurns: 0,
+    coveredFocusAreas: [],
+    coverage: {
+      currentWorkReality: false,
+      levelSeniority: false,
+      transferableStrengths: false,
+      directionOfChange: false,
+      workStyleFit: false,
+      mismatchRisk: false,
+      evidenceDepth: false,
+      motivationFit: false,
+      domainContext: false,
+      noGoClarity: false,
+      profileStrengthGap: false,
+    },
+  };
+}
+
 function hasSubstantiveAnswer(value: string) {
   return normalizeText(value).split(" ").filter(Boolean).length >= 6;
+}
+
+function getLowQualityReason(value: string) {
+  const normalized = normalizeText(value);
+  const tokens = normalized.split(" ").filter(Boolean);
+  const uniqueTokens = new Set(tokens);
+
+  if (tokens.length >= 8) {
+    if (
+      hasConcreteEvidenceSignal(value) ||
+      hasMotivationSignal(value) ||
+      hasDomainContextSignal(value) ||
+      hasNoGoSignal(value) ||
+      hasProfileStrengthGapSignal(value)
+    ) {
+      return null;
+    }
+  }
+
+  if (tokens.length <= 2) {
+    return "TOO_SHORT";
+  }
+
+  const lowValuePhrases = [
+    "ved ikke",
+    "ved det ikke",
+    "idk",
+    "test",
+    "tester",
+    "123",
+    "hej",
+    "hello",
+    "asdf",
+    "qwer",
+    "bla bla",
+    "blah blah",
+    "ingen ide",
+    "same",
+    "ok",
+    "ja",
+    "nej",
+  ];
+
+  if (lowValuePhrases.includes(normalized)) {
+    return "TESTLIKE_FILLER";
+  }
+
+  if (/^\d+$/.test(normalized)) {
+    return "NUMERIC_FILLER";
+  }
+
+  if (tokens.length <= 4 && lowValuePhrases.some((phrase) => normalized.includes(phrase))) {
+    return "SHORT_FILLER";
+  }
+
+  if (tokens.length <= 5 && uniqueTokens.size <= 2) {
+    return "REPETITIVE_FILLER";
+  }
+
+  if (tokens.length <= 6 && !hasSubstantiveAnswer(value)) {
+    return "TOO_SHORT_GENERIC";
+  }
+
+  return null;
+}
+
+function hasConcreteEvidenceSignal(value: string) {
+  const normalized = normalizeText(value);
+  const evidenceKeywords = [
+    "ansvar",
+    "ejede",
+    "ejet",
+    "leverede",
+    "leverancer",
+    "resultat",
+    "resultater",
+    "forbedrede",
+    "projekt",
+    "projekter",
+    "stakeholder",
+    "team",
+    "budget",
+    "proces",
+    "strategi",
+    "kunde",
+    "implementerede",
+    "system",
+    "vaerktoj",
+    "analyse",
+    "tal",
+    "maal",
+    "eksempel",
+    "case",
+  ];
+
+  const matchedKeywords = evidenceKeywords.filter((keyword) => normalized.includes(keyword)).length;
+  return hasSubstantiveAnswer(value) && matchedKeywords >= 2;
+}
+
+function hasMotivationSignal(value: string) {
+  const normalized = normalizeText(value);
+  const motivationKeywords = [
+    "onsker",
+    "vil",
+    "helst",
+    "trives",
+    "motiverer",
+    "motiverende",
+    "undga",
+    "ikke",
+    "gerne",
+    "mindre",
+    "mere",
+    "passe",
+    "passer",
+    "energi",
+    "lyst",
+  ];
+
+  const matchedKeywords = motivationKeywords.filter((keyword) => normalized.includes(keyword)).length;
+  return hasSubstantiveAnswer(value) && matchedKeywords >= 2;
+}
+
+function hasNoGoSignal(value: string) {
+  const normalized = normalizeText(value);
+  const noGoKeywords = [
+    "undga",
+    "ikke",
+    "vil ikke",
+    "onsker ikke",
+    "fravaelger",
+    "fravalg",
+    "passer ikke",
+    "trives ikke",
+    "ikke lyst",
+    "ikke interesseret",
+  ];
+
+  const matchedKeywords = noGoKeywords.filter((keyword) => normalized.includes(keyword)).length;
+  return hasSubstantiveAnswer(value) && matchedKeywords >= 2;
+}
+
+function hasProfileStrengthGapSignal(value: string) {
+  const normalized = normalizeText(value);
+  const gapKeywords = [
+    "mangler",
+    "ikke endnu",
+    "vil gerne",
+    "onsker at bevise",
+    "har ikke",
+    "mere ansvar",
+    "taettere pa",
+    "overgang",
+    "skifte",
+    "naeste skridt",
+    "bygge op",
+  ];
+
+  const matchedKeywords = gapKeywords.filter((keyword) => normalized.includes(keyword)).length;
+  return hasSubstantiveAnswer(value) && matchedKeywords >= 2;
+}
+
+function hasDomainContextSignal(value: string) {
+  const normalized = normalizeText(value);
+  const domainKeywords = [
+    "branche",
+    "industri",
+    "sektor",
+    "kunder",
+    "kundetype",
+    "b2b",
+    "b2c",
+    "saas",
+    "offentlig",
+    "privat",
+    "reguleret",
+    "produktion",
+    "logistik",
+    "sundhed",
+    "finans",
+    "detail",
+    "byggeri",
+    "energi",
+    "teknologi",
+    "forretning",
+    "marked",
+    "medico",
+    "kommune",
+    "hospital",
+  ];
+
+  const matchedKeywords = domainKeywords.filter((keyword) => normalized.includes(keyword)).length;
+  return hasSubstantiveAnswer(value) && matchedKeywords >= 2;
 }
 
 function hasDescriptiveDepth(value: string | null, minimumWords = 6) {
@@ -238,30 +547,242 @@ function areQuestionsTooSimilar(previousQuestion: string, nextQuestion: string) 
   return overlapRatio >= 0.6;
 }
 
+function containsDisallowedJargon(question: string) {
+  const normalized = normalizeText(question);
+  const disallowedTerms = [
+    "individual contributor",
+    "career path",
+    "people manager",
+    "ownership",
+    "scope",
+    "stakeholder management",
+    "delivery",
+    "fit gap",
+    "seniority level",
+  ];
+
+  return disallowedTerms.some((term) => normalized.includes(term));
+}
+
+function logRetryAttempt(attempt: number, reasonCode: ReasonCode) {
+  if (process.env.NODE_ENV !== "production") {
+    console.warn(`[interview] retry attempt ${attempt} after ${reasonCode}`);
+  }
+}
+
+function normalizeInterviewState(value: unknown): InterviewState {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return createEmptyInterviewState();
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const coverageCandidate =
+    candidate.coverage && typeof candidate.coverage === "object" && !Array.isArray(candidate.coverage)
+      ? (candidate.coverage as Record<string, unknown>)
+      : {};
+
+  const coveredFocusAreas = Array.isArray(candidate.coveredFocusAreas)
+    ? candidate.coveredFocusAreas.filter(isFocusArea)
+    : [];
+
+  return {
+    answeredTurns:
+      typeof candidate.answeredTurns === "number" && Number.isInteger(candidate.answeredTurns) && candidate.answeredTurns >= 0
+        ? candidate.answeredTurns
+        : 0,
+    coveredFocusAreas,
+    coverage: {
+      currentWorkReality: coverageCandidate.currentWorkReality === true,
+      levelSeniority: coverageCandidate.levelSeniority === true,
+      transferableStrengths: coverageCandidate.transferableStrengths === true,
+      directionOfChange: coverageCandidate.directionOfChange === true,
+      workStyleFit: coverageCandidate.workStyleFit === true,
+      mismatchRisk: coverageCandidate.mismatchRisk === true,
+      evidenceDepth: coverageCandidate.evidenceDepth === true,
+      motivationFit: coverageCandidate.motivationFit === true,
+      domainContext: coverageCandidate.domainContext === true,
+      noGoClarity: coverageCandidate.noGoClarity === true,
+      profileStrengthGap: coverageCandidate.profileStrengthGap === true,
+    },
+  };
+}
+
+function updateInterviewState({
+  interviewState,
+  lastAssistantQuestion,
+  lastUserAnswer,
+  profileSummary,
+}: {
+  interviewState: InterviewState;
+  lastAssistantQuestion: string | null;
+  lastUserAnswer: string | null;
+  profileSummary?: ProfileSummary;
+}) {
+  const nextState: InterviewState = {
+    answeredTurns: interviewState.answeredTurns,
+    coveredFocusAreas: [...interviewState.coveredFocusAreas],
+    coverage: { ...interviewState.coverage },
+  };
+
+  if (!lastAssistantQuestion || !lastUserAnswer || !hasSubstantiveAnswer(lastUserAnswer)) {
+    return nextState;
+  }
+
+  const priorFocusArea = inferFocusAreaFromQuestion(lastAssistantQuestion);
+
+  nextState.answeredTurns += 1;
+
+  if (priorFocusArea && !nextState.coveredFocusAreas.includes(priorFocusArea)) {
+    nextState.coveredFocusAreas.push(priorFocusArea);
+  }
+
+  if (priorFocusArea === "current_work_reality") {
+    nextState.coverage.currentWorkReality = true;
+  }
+
+  if (priorFocusArea === "level_seniority") {
+    nextState.coverage.levelSeniority = true;
+  }
+
+  if (priorFocusArea === "transferable_strengths") {
+    nextState.coverage.transferableStrengths = true;
+  }
+
+  if (priorFocusArea === "direction_change") {
+    nextState.coverage.directionOfChange = true;
+  }
+
+  if (priorFocusArea === "work_style_fit") {
+    nextState.coverage.workStyleFit = true;
+  }
+
+  if (priorFocusArea === "mismatch_risk") {
+    nextState.coverage.mismatchRisk = true;
+  }
+
+  if (hasConcreteEvidenceSignal(lastUserAnswer)) {
+    nextState.coverage.evidenceDepth = true;
+  }
+
+  if (hasMotivationSignal(lastUserAnswer)) {
+    nextState.coverage.motivationFit = true;
+  }
+
+  if (hasDomainContextSignal(lastUserAnswer)) {
+    nextState.coverage.domainContext = true;
+  }
+
+  if (hasNoGoSignal(lastUserAnswer)) {
+    nextState.coverage.noGoClarity = true;
+  }
+
+  if (hasProfileStrengthGapSignal(lastUserAnswer)) {
+    nextState.coverage.profileStrengthGap = true;
+  }
+
+  if (profileSummary) {
+    if (hasDescriptiveDepth(profileSummary.aiProfileCore.currentWorkReality, 7)) {
+      nextState.coverage.currentWorkReality = true;
+    }
+
+    if (hasDescriptiveDepth(profileSummary.aiProfileCore.levelSeniority, 6)) {
+      nextState.coverage.levelSeniority = true;
+    }
+
+    if (hasMeaningfulItems(profileSummary.aiProfileCore.transferableStrengths, 3, 1)) {
+      nextState.coverage.transferableStrengths = true;
+    }
+
+    if (hasDescriptiveDepth(profileSummary.aiProfileCore.directionOfChange, 6)) {
+      nextState.coverage.directionOfChange = true;
+    }
+
+    if (hasDescriptiveDepth(profileSummary.aiProfileCore.workStyleFit, 6)) {
+      nextState.coverage.workStyleFit = true;
+    }
+
+    if (hasMeaningfulItems(profileSummary.aiProfileCore.mismatchRisks, 2, 3)) {
+      nextState.coverage.mismatchRisk = true;
+    }
+
+    if (
+      hasDistinctVocabulary(
+        [
+          profileSummary.aiProfileCore.currentWorkReality,
+          profileSummary.aiProfileCore.levelSeniority,
+          profileSummary.aiProfileCore.directionOfChange,
+          profileSummary.aiProfileCore.workStyleFit,
+        ],
+        12,
+      )
+    ) {
+      nextState.coverage.evidenceDepth = true;
+    }
+
+    if (
+      hasMotivationSignal(profileSummary.aiProfileCore.directionOfChange) ||
+      hasMotivationSignal(profileSummary.aiProfileCore.workStyleFit)
+    ) {
+      nextState.coverage.motivationFit = true;
+    }
+
+    if (
+      hasDomainContextSignal(profileSummary.aiProfileCore.currentWorkReality) ||
+      profileSummary.aiProfileCore.transferableStrengths.some((item) => hasDomainContextSignal(item))
+    ) {
+      nextState.coverage.domainContext = true;
+    }
+
+    if (
+      hasNoGoSignal(profileSummary.aiProfileCore.workStyleFit) ||
+      profileSummary.aiProfileCore.mismatchRisks.some((item) => hasNoGoSignal(item))
+    ) {
+      nextState.coverage.noGoClarity = true;
+    }
+
+    if (
+      hasProfileStrengthGapSignal(profileSummary.aiProfileCore.directionOfChange) ||
+      profileSummary.aiProfileCore.mismatchRisks.some((item) => hasProfileStrengthGapSignal(item))
+    ) {
+      nextState.coverage.profileStrengthGap = true;
+    }
+  }
+
+  return nextState;
+}
+
+function hasMinimumInterviewCoverage(interviewState: InterviewState) {
+  const broaderCoverageCount = [
+    interviewState.coverage.levelSeniority,
+    interviewState.coverage.workStyleFit,
+    interviewState.coverage.mismatchRisk,
+    interviewState.coverage.domainContext,
+    interviewState.coverage.noGoClarity,
+    interviewState.coverage.profileStrengthGap,
+  ].filter(Boolean).length;
+
+  return (
+    interviewState.answeredTurns >= 6 &&
+    interviewState.coveredFocusAreas.length >= 5 &&
+    interviewState.coverage.currentWorkReality &&
+    interviewState.coverage.directionOfChange &&
+    interviewState.coverage.transferableStrengths &&
+    interviewState.coverage.evidenceDepth &&
+    interviewState.coverage.motivationFit &&
+    broaderCoverageCount >= 2
+  );
+}
+
 function isProfileSummarySufficientForPhase1({
   profileSummary,
   lastAssistantQuestion,
   lastUserAnswer,
+  interviewState,
 }: {
-  profileSummary: {
-    userProfileData: {
-      name: string | null;
-      currentRole: string | null;
-      yearsExperience: string | null;
-      targetDirection: string | null;
-    };
-    aiProfileCore: {
-      currentWorkReality: string;
-      levelSeniority: string;
-      transferableStrengths: string[];
-      directionOfChange: string;
-      workStyleFit: string;
-      mismatchRisks: string[];
-      confidence: ConfidenceLevel;
-    };
-  };
+  profileSummary: ProfileSummary;
   lastAssistantQuestion: string | null;
   lastUserAnswer: string | null;
+  interviewState: InterviewState;
 }) {
   if (!lastAssistantQuestion || !lastUserAnswer) {
     return false;
@@ -358,15 +879,16 @@ function isProfileSummarySufficientForPhase1({
     return false;
   }
 
+  if (!hasMinimumInterviewCoverage(interviewState)) {
+    return false;
+  }
+
   return true;
 }
 
 export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) {
-    return Response.json({
-      ok: false,
-      error: "OpenAI is not configured.",
-    });
+    return errorResponse("OpenAI is not configured.", "OPENAI_REQUEST_FAILED");
   }
 
   let body: unknown;
@@ -374,35 +896,23 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({
-      ok: false,
-      error: "Invalid JSON body.",
-    });
+    return errorResponse("Invalid JSON body.");
   }
 
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return Response.json({
-      ok: false,
-      error: "Invalid request body.",
-    });
+    return errorResponse("Invalid request body.");
   }
 
   const payload = body as Record<string, unknown>;
 
   if (payload.phase !== "initial") {
-    return Response.json({
-      ok: false,
-      error: "Invalid phase.",
-    });
+    return errorResponse("Invalid phase.");
   }
 
   const rawProfileDraft = payload.profileDraft;
 
   if (!rawProfileDraft || typeof rawProfileDraft !== "object" || Array.isArray(rawProfileDraft)) {
-    return Response.json({
-      ok: false,
-      error: "Invalid profileDraft.",
-    });
+    return errorResponse("Invalid profileDraft.");
   }
 
   const profileDraftInput = rawProfileDraft as Record<string, unknown>;
@@ -416,10 +926,7 @@ export async function POST(request: Request) {
     }
 
     if (!isShortString(rawValue)) {
-      return Response.json({
-        ok: false,
-        error: `Invalid ${key}.`,
-      });
+      return errorResponse(`Invalid ${key}.`);
     }
 
     profileDraft[key] = rawValue.trim();
@@ -427,12 +934,10 @@ export async function POST(request: Request) {
 
   const lastUserAnswer = payload.lastUserAnswer;
   const lastAssistantQuestion = payload.lastAssistantQuestion;
+  const interviewState = normalizeInterviewState(payload.interviewState);
 
   if (lastUserAnswer !== undefined && lastUserAnswer !== null && !isShortString(lastUserAnswer, 1000)) {
-    return Response.json({
-      ok: false,
-      error: "Invalid lastUserAnswer.",
-    });
+    return errorResponse("Invalid lastUserAnswer.");
   }
 
   if (
@@ -440,10 +945,7 @@ export async function POST(request: Request) {
     lastAssistantQuestion !== null &&
     !isShortString(lastAssistantQuestion, 300)
   ) {
-    return Response.json({
-      ok: false,
-      error: "Invalid lastAssistantQuestion.",
-    });
+    return errorResponse("Invalid lastAssistantQuestion.");
   }
 
   if (
@@ -451,10 +953,20 @@ export async function POST(request: Request) {
     lastUserAnswer.trim().length > 0 &&
     !(typeof lastAssistantQuestion === "string" && lastAssistantQuestion.trim().length > 0)
   ) {
-    return Response.json({
-      ok: false,
-      error: "lastAssistantQuestion is required.",
-    });
+    return errorResponse("lastAssistantQuestion is required.");
+  }
+
+  const lowQualityReason =
+    typeof lastUserAnswer === "string" && lastUserAnswer.trim().length > 0
+      ? getLowQualityReason(lastUserAnswer)
+      : null;
+
+  if (lowQualityReason) {
+    return errorResponse(
+      "Svaret er for kort eller uklart til at føre interviewet videre.",
+      "LOW_QUALITY_ANSWER",
+      { lowQualityReason },
+    );
   }
 
   const systemPrompt = [
@@ -471,6 +983,14 @@ export async function POST(request: Request) {
     "Do not repeat the same clarification if the latest user answer already resolves it sufficiently for phase 1.",
     "If the latest answer has already clarified the active uncertainty, either move to a different unresolved area or return status complete.",
     "Repeated direction-of-change questions are a sign to stop if the user's direction is already clear enough for phase 1.",
+    "You are working toward actual coverage across profiling dimensions, not just a plausible sounding summary.",
+    "Use plain Danish that ordinary users across job types can understand.",
+    "Avoid English career jargon and internal HR or product language unless the user's own profile clearly justifies it.",
+    "Prefer normal Danish expressions such as specialist uden personaleansvar, faglig specialist, rolle med personaleansvar, or lederrolle when relevant.",
+    "Do not complete until enough areas are clarified in substance: current work reality, direction of change, transferable strengths, evidence depth, motivation, and broader missing dimensions such as branch or domain context, no-go conditions, work-style fit, mismatch risk, or whether the current profile is strong enough for the target level.",
+    "If direction of change is already clear, move to missing areas instead of circling back.",
+    "Do not over-prioritize role identity, level, and strengths if branch context, concrete examples, results, motivation, fravalg, or profile-strength-versus-goal-level are still weak.",
+    "Actively move toward missing areas such as domain or industry context, examples, results, evidence, motivation, no-go conditions, and profile strength versus target level when those areas remain unresolved.",
     "Think in terms of sufficiency for phase-1 profile evaluation: current work reality, level or seniority, transferable strengths, direction of change, work-style fit, and mismatch risk.",
     "Use status complete only when there is enough clarity to begin serious next-step profile assessment.",
     "If status is continue, the question text must be written in natural, professional Danish.",
@@ -486,215 +1006,306 @@ export async function POST(request: Request) {
     profileDraft,
     lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
     lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+    interviewState,
     instruction:
       "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. The human-facing question text must be in Danish. If complete, return the structured phase-1 profile summary. Return only the required JSON object.",
   });
 
-  try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: "system",
-            content: [{ type: "input_text", text: systemPrompt }],
-          },
-          {
-            role: "user",
-            content: [{ type: "input_text", text: userPrompt }],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      return Response.json({
-        ok: false,
-        error: "OpenAI request failed.",
-      });
-    }
-
-    const data = (await response.json()) as Record<string, unknown>;
-    const outputText = extractOutputText(data);
-
-    if (!outputText) {
-      return Response.json({
-        ok: false,
-        error: "Could not parse model output.",
-      });
-    }
-
-    let parsed: unknown;
-
+  async function generateInterviewStep(): Promise<GenerateSuccess | GenerateFailure> {
     try {
-      parsed = JSON.parse(outputText);
-    } catch {
-      return Response.json({
-        ok: false,
-        error: "Invalid model JSON.",
-      });
-    }
-
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return Response.json({
-        ok: false,
-        error: "Invalid model response.",
-      });
-    }
-
-    const result = parsed as Record<string, unknown>;
-    const status = result.status;
-
-    if (!isInterviewStatus(status)) {
-      return Response.json({
-        ok: false,
-        error: "Invalid interview status.",
-      });
-    }
-
-    if (status === "complete") {
-      const profileSummary = result.profileSummary;
-
-      if (!profileSummary || typeof profileSummary !== "object" || Array.isArray(profileSummary)) {
-        return Response.json({
-          ok: false,
-          error: "Invalid profile summary.",
-        });
-      }
-
-      const summary = profileSummary as Record<string, unknown>;
-      const userProfileData = summary.userProfileData;
-      const aiProfileCore = summary.aiProfileCore;
-
-      if (!userProfileData || typeof userProfileData !== "object" || Array.isArray(userProfileData)) {
-        return Response.json({
-          ok: false,
-          error: "Invalid user profile data.",
-        });
-      }
-
-      if (!aiProfileCore || typeof aiProfileCore !== "object" || Array.isArray(aiProfileCore)) {
-        return Response.json({
-          ok: false,
-          error: "Invalid AI profile core.",
-        });
-      }
-
-      const userData = userProfileData as Record<string, unknown>;
-      const aiCore = aiProfileCore as Record<string, unknown>;
-
-      const normalizedUserProfileData = {
-        name: toNullableShortString(userData.name),
-        currentRole: toNullableShortString(userData.currentRole),
-        yearsExperience: toNullableShortString(userData.yearsExperience),
-        targetDirection: toNullableShortString(userData.targetDirection),
-      };
-
-      const currentWorkReality = toNullableShortString(aiCore.currentWorkReality);
-      const levelSeniority = toNullableShortString(aiCore.levelSeniority);
-      const directionOfChange = toNullableShortString(aiCore.directionOfChange);
-      const workStyleFit = toNullableShortString(aiCore.workStyleFit);
-
-      if (!currentWorkReality || !levelSeniority || !directionOfChange || !workStyleFit) {
-        return Response.json({
-          ok: false,
-          error: "Invalid AI profile core.",
-        });
-      }
-
-      if (!isStringArray(aiCore.transferableStrengths) || !isStringArray(aiCore.mismatchRisks)) {
-        return Response.json({
-          ok: false,
-          error: "Invalid AI profile arrays.",
-        });
-      }
-
-      if (!isConfidenceLevel(aiCore.confidence)) {
-        return Response.json({
-          ok: false,
-          error: "Invalid confidence level.",
-        });
-      }
-
-      const normalizedProfileSummary = {
-        userProfileData: normalizedUserProfileData,
-        aiProfileCore: {
-          currentWorkReality,
-          levelSeniority,
-          transferableStrengths: aiCore.transferableStrengths.map((item) => item.trim()),
-          directionOfChange,
-          workStyleFit,
-          mismatchRisks: aiCore.mismatchRisks.map((item) => item.trim()),
-          confidence: aiCore.confidence,
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
-      };
+        body: JSON.stringify({
+          model,
+          input: [
+            {
+              role: "system",
+              content: [{ type: "input_text", text: systemPrompt }],
+            },
+            {
+              role: "user",
+              content: [{ type: "input_text", text: userPrompt }],
+            },
+          ],
+        }),
+      });
 
-      if (
-        !isProfileSummarySufficientForPhase1({
-          profileSummary: normalizedProfileSummary,
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: "OpenAI request failed.",
+          reasonCode: "OPENAI_REQUEST_FAILED",
+          retryable: true,
+        };
+      }
+
+      const data = (await response.json()) as Record<string, unknown>;
+      const outputText = extractOutputText(data);
+
+      if (!outputText) {
+        return {
+          ok: false,
+          error: "Could not parse model output.",
+          reasonCode: "INVALID_MODEL_OUTPUT",
+          retryable: true,
+        };
+      }
+
+      let parsed: unknown;
+
+      try {
+        parsed = JSON.parse(outputText);
+      } catch {
+        return {
+          ok: false,
+          error: "Invalid model JSON.",
+          reasonCode: "INVALID_MODEL_JSON",
+          retryable: true,
+        };
+      }
+
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return {
+          ok: false,
+          error: "Invalid model response.",
+          reasonCode: "INVALID_MODEL_OUTPUT",
+          retryable: true,
+        };
+      }
+
+      const result = parsed as Record<string, unknown>;
+      const status = result.status;
+
+      if (!isInterviewStatus(status)) {
+        return {
+          ok: false,
+          error: "Invalid interview status.",
+          reasonCode: "INVALID_MODEL_OUTPUT",
+          retryable: true,
+        };
+      }
+
+      if (status === "complete") {
+        const profileSummary = result.profileSummary;
+
+        if (!profileSummary || typeof profileSummary !== "object" || Array.isArray(profileSummary)) {
+          return {
+            ok: false,
+            error: "Invalid profile summary.",
+            reasonCode: "INVALID_PROFILE_SUMMARY",
+            retryable: true,
+          };
+        }
+
+        const summary = profileSummary as Record<string, unknown>;
+        const userProfileData = summary.userProfileData;
+        const aiProfileCore = summary.aiProfileCore;
+
+        if (!userProfileData || typeof userProfileData !== "object" || Array.isArray(userProfileData)) {
+          return {
+            ok: false,
+            error: "Invalid user profile data.",
+            reasonCode: "INVALID_PROFILE_SUMMARY",
+            retryable: true,
+          };
+        }
+
+        if (!aiProfileCore || typeof aiProfileCore !== "object" || Array.isArray(aiProfileCore)) {
+          return {
+            ok: false,
+            error: "Invalid AI profile core.",
+            reasonCode: "INVALID_PROFILE_SUMMARY",
+            retryable: true,
+          };
+        }
+
+        const userData = userProfileData as Record<string, unknown>;
+        const aiCore = aiProfileCore as Record<string, unknown>;
+
+        const normalizedUserProfileData = {
+          name: toNullableShortString(userData.name),
+          currentRole: toNullableShortString(userData.currentRole),
+          yearsExperience: toNullableShortString(userData.yearsExperience),
+          targetDirection: toNullableShortString(userData.targetDirection),
+        };
+
+        const currentWorkReality = toNullableShortString(aiCore.currentWorkReality);
+        const levelSeniority = toNullableShortString(aiCore.levelSeniority);
+        const directionOfChange = toNullableShortString(aiCore.directionOfChange);
+        const workStyleFit = toNullableShortString(aiCore.workStyleFit);
+
+        if (!currentWorkReality || !levelSeniority || !directionOfChange || !workStyleFit) {
+          return {
+            ok: false,
+            error: "Invalid AI profile core.",
+            reasonCode: "INVALID_PROFILE_SUMMARY",
+            retryable: true,
+          };
+        }
+
+        if (!isStringArray(aiCore.transferableStrengths) || !isStringArray(aiCore.mismatchRisks)) {
+          return {
+            ok: false,
+            error: "Invalid AI profile arrays.",
+            reasonCode: "INVALID_PROFILE_SUMMARY",
+            retryable: true,
+          };
+        }
+
+        if (!isConfidenceLevel(aiCore.confidence)) {
+          return {
+            ok: false,
+            error: "Invalid confidence level.",
+            reasonCode: "INVALID_PROFILE_SUMMARY",
+            retryable: true,
+          };
+        }
+
+        const normalizedProfileSummary = {
+          userProfileData: normalizedUserProfileData,
+          aiProfileCore: {
+            currentWorkReality,
+            levelSeniority,
+            transferableStrengths: aiCore.transferableStrengths.map((item) => item.trim()),
+            directionOfChange,
+            workStyleFit,
+            mismatchRisks: aiCore.mismatchRisks.map((item) => item.trim()),
+            confidence: aiCore.confidence,
+          },
+        };
+
+        const updatedInterviewState = updateInterviewState({
+          interviewState,
           lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
           lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
-        })
-      ) {
-        return Response.json({
-          ok: false,
-          error: "Profile summary is not sufficient.",
+          profileSummary: normalizedProfileSummary,
         });
+
+        if (
+          !isProfileSummarySufficientForPhase1({
+            profileSummary: normalizedProfileSummary,
+            lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
+            lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+            interviewState: updatedInterviewState,
+          })
+        ) {
+          return {
+            ok: false,
+            error: "Interview coverage is not sufficient for completion.",
+            reasonCode: "INSUFFICIENT_COVERAGE",
+            retryable: true,
+          };
+        }
+
+        return {
+          ok: true,
+          status,
+          profileSummary: normalizedProfileSummary,
+          interviewState: updatedInterviewState,
+        };
       }
 
-      return Response.json({
+      const question = typeof result.question === "string" ? result.question.trim() : "";
+      const focusArea = result.focusArea;
+
+      if (!question || question.length > 300 || /\n/.test(question)) {
+        return {
+          ok: false,
+          error: "Could not generate question.",
+          reasonCode: "INVALID_MODEL_OUTPUT",
+          retryable: true,
+        };
+      }
+
+      if (!isFocusArea(focusArea)) {
+        return {
+          ok: false,
+          error: "Invalid focus area.",
+          reasonCode: "INVALID_MODEL_OUTPUT",
+          retryable: true,
+        };
+      }
+
+      if (containsDisallowedJargon(question)) {
+        return {
+          ok: false,
+          error: "Interview question is not in plain Danish.",
+          reasonCode: "INVALID_PLAIN_DANISH",
+          retryable: true,
+        };
+      }
+
+      const priorFocusArea =
+        typeof lastAssistantQuestion === "string" ? inferFocusAreaFromQuestion(lastAssistantQuestion) : null;
+
+      if (
+        typeof lastAssistantQuestion === "string" &&
+        priorFocusArea === focusArea &&
+        areQuestionsTooSimilar(lastAssistantQuestion, question)
+      ) {
+        return {
+          ok: false,
+          error: "Repeated interview question.",
+          reasonCode: "REPEATED_QUESTION",
+          retryable: true,
+        };
+      }
+
+      const updatedInterviewState = updateInterviewState({
+        interviewState,
+        lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
+        lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+      });
+
+      return {
         ok: true,
         status,
-        profileSummary: normalizedProfileSummary,
-      });
-    }
-
-    const question = typeof result.question === "string" ? result.question.trim() : "";
-    const focusArea = result.focusArea;
-
-    if (!question || question.length > 300 || /\n/.test(question)) {
-      return Response.json({
+        question,
+        focusArea,
+        interviewState: updatedInterviewState,
+      };
+    } catch {
+      return {
         ok: false,
-        error: "Could not generate question.",
-      });
+        error: "OpenAI request failed.",
+        reasonCode: "OPENAI_REQUEST_FAILED",
+        retryable: true,
+      };
+    }
+  }
+
+  const maxAttempts = 3;
+  let lastFailure: GenerateFailure | null = null;
+  const retryTrail: ReasonCode[] = [];
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const result = await generateInterviewStep();
+
+    if (result.ok) {
+      return Response.json(result);
     }
 
-    if (!isFocusArea(focusArea)) {
-      return Response.json({
-        ok: false,
-        error: "Invalid focus area.",
-      });
+    lastFailure = result;
+    retryTrail.push(result.reasonCode);
+
+    if (!result.retryable) {
+      return errorResponse(result.error, result.reasonCode);
     }
 
-    const priorFocusArea =
-      typeof lastAssistantQuestion === "string" ? inferFocusAreaFromQuestion(lastAssistantQuestion) : null;
-
-    if (
-      typeof lastAssistantQuestion === "string" &&
-      priorFocusArea === focusArea &&
-      areQuestionsTooSimilar(lastAssistantQuestion, question)
-    ) {
-      return Response.json({
-        ok: false,
-        error: "Repeated interview question.",
-      });
+    if (attempt < maxAttempts) {
+      logRetryAttempt(attempt, result.reasonCode);
+      continue;
     }
+  }
 
-    return Response.json({
-      ok: true,
-      status,
-      question,
-      focusArea,
-    });
-  } catch {
-    return Response.json({
-      ok: false,
-      error: "Server request failed.",
+  if (lastFailure) {
+    return errorResponse("Could not generate the next interview step.", "RETRY_EXHAUSTED", {
+      lastFailureReasonCode: lastFailure.reasonCode,
+      retryTrail,
     });
   }
 }
