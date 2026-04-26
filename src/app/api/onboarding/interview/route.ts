@@ -86,6 +86,17 @@ type ProfileSummary = {
   };
 };
 
+type ReadinessLevel = "minimum_usable" | "stronger_profile" | "not_strong_enough_for_target";
+type TargetDirectionSupport = "partial" | "strong" | "not_yet_proven";
+
+type ReadinessAssessment = {
+  level: ReadinessLevel;
+  targetDirectionSupport: TargetDirectionSupport;
+  summary: string;
+  strengthSignals: string[];
+  gapSignals: string[];
+};
+
 type ErrorPayload = {
   ok: false;
   error: string;
@@ -108,6 +119,7 @@ type GenerateSuccess =
       status: "complete";
       profileSummary: ProfileSummary;
       interviewState: InterviewState;
+      readinessAssessment: ReadinessAssessment;
     };
 
 type GenerateFailure = {
@@ -117,8 +129,14 @@ type GenerateFailure = {
   retryable: boolean;
 };
 
+type AnswerQuality = "junk_or_testlike" | "vague_but_real_attempt" | "substantive_answer";
+
 function isShortString(value: unknown, maxLength = 300): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
+}
+
+function isInterviewAnswerString(value: unknown, maxLength = 5000): value is string {
+  return typeof value === "string" && value.length <= maxLength;
 }
 
 function errorResponse(
@@ -270,6 +288,32 @@ function createEmptyInterviewState(): InterviewState {
 
 function hasSubstantiveAnswer(value: string) {
   return normalizeText(value).split(" ").filter(Boolean).length >= 6;
+}
+
+function inferAnswerQuality(value: string): AnswerQuality {
+  const normalized = normalizeText(value);
+  const tokens = normalized.split(" ").filter(Boolean);
+  const clauseCount = value.split(/[,.!?;:\n]/).map((part) => part.trim()).filter(Boolean).length;
+
+  if (getLowQualityReason(value)) {
+    return "junk_or_testlike";
+  }
+
+  const supportiveSignals = [
+    hasConcreteEvidenceSignal(value),
+    hasOwnershipScopeSignal(value),
+    hasResultEvidenceSignal(value),
+    hasMotivationSignal(value),
+    hasDomainContextSignal(value),
+    hasNoGoSignal(value),
+    hasProfileStrengthGapSignal(value),
+  ].filter(Boolean).length;
+
+  if (tokens.length >= 12 || clauseCount >= 2 || supportiveSignals >= 2) {
+    return "substantive_answer";
+  }
+
+  return "vague_but_real_attempt";
 }
 
 function getLowQualityReason(value: string) {
@@ -1136,6 +1180,46 @@ function buildRecoveryQuestionForMissingCoverage(
   return null;
 }
 
+function buildGuidedRecoveryQuestionForVagueAnswer(focusArea: FocusArea | null) {
+  switch (focusArea) {
+    case "current_work_reality":
+      return {
+        question: "Kan du tage én konkret opgave eller situation fra din hverdag og beskrive, hvad du selv havde ansvar for?",
+        focusArea,
+      };
+    case "level_seniority":
+      return {
+        question: "Hvad havde du selv ansvaret for, og hvad lå hos andre?",
+        focusArea,
+      };
+    case "transferable_strengths":
+      return {
+        question: "Kan du nævne ét konkret eksempel, hvor den styrke kom tydeligt i spil?",
+        focusArea,
+      };
+    case "direction_change":
+      return {
+        question: "Hvad er den vigtigste grund til, at du vil i den retning, og hvad vil du gerne have mindre af?",
+        focusArea,
+      };
+    case "work_style_fit":
+      return {
+        question: "Hvad i din nuværende hverdag giver dig mest energi, og hvad fungerer dårligst?",
+        focusArea,
+      };
+    case "mismatch_risk":
+      return {
+        question: "Hvad vil du helst undgå i dit næste job, hvis du skal trives og lykkes?",
+        focusArea,
+      };
+    default:
+      return {
+        question: "Kan du tage ét konkret eksempel fra din hverdag, som viser det?",
+        focusArea: "current_work_reality" as FocusArea,
+      };
+  }
+}
+
 function isProfileSummarySufficientForPhase1({
   profileSummary,
   lastAssistantQuestion,
@@ -1249,6 +1333,159 @@ function isProfileSummarySufficientForPhase1({
   return true;
 }
 
+function hasHigherBarTargetDirection(targetDirection: string | null | undefined) {
+  const normalized = normalizeText(targetDirection ?? "");
+  const higherBarKeywords = [
+    "product manager",
+    "produktleder",
+    "product owner",
+    "leder",
+    "lederrolle",
+    "head of",
+    "director",
+    "senior",
+    "strategi",
+    "strategisk",
+  ];
+
+  return higherBarKeywords.some((keyword) => normalized.includes(keyword));
+}
+
+function buildReadinessAssessment({
+  profileDraft,
+  profileSummary,
+  interviewState,
+}: {
+  profileDraft: ProfileDraft;
+  profileSummary: ProfileSummary;
+  interviewState: InterviewState;
+}): ReadinessAssessment {
+  const coverage = interviewState.coverage;
+  const confidence = profileSummary.aiProfileCore.confidence;
+  const targetDirection = profileDraft.targetDirection?.trim() ?? null;
+  const practicalEvidenceCount = [
+    coverage.concreteEvidence,
+    coverage.ownershipScope,
+    coverage.resultEvidence,
+  ].filter(Boolean).length;
+  const broadSupportCount = [
+    coverage.levelSeniority,
+    coverage.workStyleFit,
+    coverage.domainContext,
+    coverage.noGoClarity,
+    coverage.mismatchRisk,
+  ].filter(Boolean).length;
+  const strongEvidence =
+    coverage.evidenceDepth &&
+    coverage.concreteEvidence &&
+    coverage.ownershipScope &&
+    coverage.resultEvidence;
+  const strongContext = coverage.domainContext && coverage.motivationFit && coverage.noGoClarity;
+  const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
+  const hasProfileGap = coverage.profileStrengthGap;
+
+  let targetDirectionSupport: TargetDirectionSupport;
+
+  if (
+    hasProfileGap ||
+    (higherBarTarget && (!strongEvidence || !coverage.levelSeniority || practicalEvidenceCount < 2))
+  ) {
+    targetDirectionSupport = "not_yet_proven";
+  } else if (
+    strongEvidence &&
+    coverage.levelSeniority &&
+    coverage.domainContext &&
+    coverage.workStyleFit &&
+    confidence !== "low"
+  ) {
+    targetDirectionSupport = "strong";
+  } else {
+    targetDirectionSupport = "partial";
+  }
+
+  let level: ReadinessLevel;
+
+  if (targetDirectionSupport === "not_yet_proven") {
+    level = "not_strong_enough_for_target";
+  } else if (strongEvidence && strongContext && !hasProfileGap && confidence !== "low" && broadSupportCount >= 4) {
+    level = "stronger_profile";
+  } else {
+    level = "minimum_usable";
+  }
+
+  const strengthSignals: string[] = [];
+  const gapSignals: string[] = [];
+
+  if (coverage.currentWorkReality) {
+    strengthSignals.push("Du har tydelig beskrivelse af din nuværende arbejdssituation");
+  }
+  if (coverage.directionOfChange) {
+    strengthSignals.push("Din retning er klart beskrevet");
+  }
+  if (coverage.ownershipScope) {
+    strengthSignals.push("Du har konkrete eksempler på ansvar og opgaveejerskab");
+  }
+  if (coverage.resultEvidence) {
+    strengthSignals.push("Du har eksempler på, hvad der kom ud af dit arbejde");
+  }
+  if (coverage.domainContext) {
+    strengthSignals.push("Din branche- og kontekstforståelse er godt beskrevet");
+  }
+  if (coverage.workStyleFit) {
+    strengthSignals.push("Det er tydeligt, hvilke rammer og arbejdsformer der passer dig");
+  }
+
+  if (hasProfileGap) {
+    gapSignals.push("Din profil viser stadig et hul mellem nuværende beviser og den retning, du sigter mod");
+  }
+  if (!coverage.resultEvidence) {
+    gapSignals.push("Der mangler stadig stærkere beviser for resultater eller effekt");
+  }
+  if (!coverage.ownershipScope) {
+    gapSignals.push("Det er endnu ikke tydeligt nok, hvilket ansvar du selv har båret");
+  }
+  if (!coverage.domainContext) {
+    gapSignals.push("Din erfaring er endnu ikke stærkt nok forankret i en tydelig branche- eller kundekontekst");
+  }
+  if (higherBarTarget && !coverage.levelSeniority) {
+    gapSignals.push("Du mangler stadig stærkere tegn på niveau og ansvar i forhold til målretningen");
+  }
+  if (targetDirectionSupport === "not_yet_proven" && targetDirection) {
+    gapSignals.push(`Din profil er endnu mere indirekte end direkte i forhold til ${targetDirection}`);
+  }
+
+  if (strengthSignals.length === 0) {
+    strengthSignals.push("Din profil giver et brugbart første billede af erfaring og retning");
+  }
+
+  if (gapSignals.length === 0 && level !== "stronger_profile") {
+    gapSignals.push("Der er stadig plads til stærkere eksempler og mere direkte beviser");
+  }
+
+  let summary: string;
+
+  switch (level) {
+    case "not_strong_enough_for_target":
+      summary = "Din profil er brugbar, men endnu ikke stærk nok til den retning, du sigter mod.";
+      break;
+    case "stronger_profile":
+      summary = "Din profil fremstår stærk og relativt godt underbygget i forhold til den retning, du søger.";
+      break;
+    case "minimum_usable":
+    default:
+      summary = "Din profil er brugbar og giver et rimeligt grundlag for vurdering og målretning.";
+      break;
+  }
+
+  return {
+    level,
+    targetDirectionSupport,
+    summary,
+    strengthSignals: strengthSignals.slice(0, 4),
+    gapSignals: gapSignals.slice(0, 4),
+  };
+}
+
 export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return errorResponse("OpenAI is not configured.", "OPENAI_REQUEST_FAILED");
@@ -1299,7 +1536,7 @@ export async function POST(request: Request) {
   const lastAssistantQuestion = payload.lastAssistantQuestion;
   const interviewState = normalizeInterviewState(payload.interviewState);
 
-  if (lastUserAnswer !== undefined && lastUserAnswer !== null && !isShortString(lastUserAnswer, 1000)) {
+  if (lastUserAnswer !== undefined && lastUserAnswer !== null && !isInterviewAnswerString(lastUserAnswer, 5000)) {
     return errorResponse("Invalid lastUserAnswer.");
   }
 
@@ -1319,10 +1556,20 @@ export async function POST(request: Request) {
     return errorResponse("lastAssistantQuestion is required.");
   }
 
-  const lowQualityReason =
-    typeof lastUserAnswer === "string" && lastUserAnswer.trim().length > 0
-      ? getLowQualityReason(lastUserAnswer)
-      : null;
+  const normalizedLastAssistantQuestion =
+    typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null;
+  const rawLastUserAnswer = typeof lastUserAnswer === "string" ? lastUserAnswer : null;
+  const trimmedLastUserAnswer = rawLastUserAnswer?.trim() ?? null;
+  let answerQuality: AnswerQuality | null = null;
+  let lowQualityReason: string | null = null;
+
+  if (rawLastUserAnswer && trimmedLastUserAnswer && trimmedLastUserAnswer.length > 0) {
+    answerQuality = inferAnswerQuality(rawLastUserAnswer);
+
+    if (answerQuality === "junk_or_testlike") {
+      lowQualityReason = getLowQualityReason(rawLastUserAnswer);
+    }
+  }
 
   if (lowQualityReason) {
     return errorResponse(
@@ -1330,6 +1577,28 @@ export async function POST(request: Request) {
       "LOW_QUALITY_ANSWER",
       { lowQualityReason },
     );
+  }
+
+  if (answerQuality === "vague_but_real_attempt" && normalizedLastAssistantQuestion) {
+    const priorFocusArea = inferFocusAreaFromQuestion(normalizedLastAssistantQuestion);
+    const guidedRecovery = buildGuidedRecoveryQuestionForVagueAnswer(priorFocusArea);
+    const updatedInterviewState = updateInterviewState({
+      interviewState,
+      lastAssistantQuestion: normalizedLastAssistantQuestion,
+      lastUserAnswer: rawLastUserAnswer,
+    });
+
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(`[interview] guided recovery for vague answer on ${guidedRecovery.focusArea}`);
+    }
+
+    return Response.json({
+      ok: true,
+      status: "continue",
+      question: guidedRecovery.question,
+      focusArea: guidedRecovery.focusArea,
+      interviewState: updatedInterviewState,
+    } satisfies GenerateSuccess);
   }
 
   const systemPrompt = [
@@ -1343,6 +1612,8 @@ export async function POST(request: Request) {
     "Ask one concrete question that reduces uncertainty about work reality, level, transferable strengths, direction of change, work-style fit, or mismatch risk.",
     "If information is missing, prioritize the highest-value clarification.",
     "When a prior assistant question and user answer are provided, use that pair as controlled interview context for interpreting the user's latest answer.",
+    "Users may answer shortly, at medium length, or very fully. Adapt to the user's answer style rather than forcing short-answer behavior.",
+    "Answer style itself can contain profiling signal.",
     "Do not repeat the same clarification if the latest user answer already resolves it sufficiently for phase 1.",
     "If the latest answer has already clarified the active uncertainty, either move to a different unresolved area or return status complete.",
     "Repeated direction-of-change questions are a sign to stop if the user's direction is already clear enough for phase 1.",
@@ -1358,6 +1629,7 @@ export async function POST(request: Request) {
     "Never invent new focusArea labels.",
     "Broader themes such as domain context, evidence depth, concrete evidence, ownership scope, result evidence, motivation fit, no-go clarity, or profile-strength-gap must still be expressed through one of the six allowed focusArea values.",
     "Do not rely too much on generic preference answers when the profile evidence is still weak.",
+    "If the user makes a real attempt but stays vague or underdeveloped, ask a more supportive and scaffolded follow-up question instead of treating the answer as invalid.",
     "Ask what the user has actually done in practice, not only what they want or think they are good at.",
     "When evidence is weak, ask for a specific example, case, task pattern, responsibility, ownership scope, or practical outcome.",
     "Probe responsibility and scope when the user's target level looks higher than the currently proven evidence.",
@@ -1380,8 +1652,8 @@ export async function POST(request: Request) {
   const userPrompt = JSON.stringify({
     phase: "initial",
     profileDraft,
-    lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
-    lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+    lastAssistantQuestion: normalizedLastAssistantQuestion,
+    lastUserAnswer: rawLastUserAnswer,
     interviewState,
     instruction:
       "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. The human-facing question text must be in Danish. If complete, return the structured phase-1 profile summary. Return only the required JSON object.",
@@ -1610,6 +1882,11 @@ export async function POST(request: Request) {
           status,
           profileSummary: normalizedProfileSummary,
           interviewState: updatedInterviewState,
+          readinessAssessment: buildReadinessAssessment({
+            profileDraft,
+            profileSummary: normalizedProfileSummary,
+            interviewState: updatedInterviewState,
+          }),
         };
       }
 

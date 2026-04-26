@@ -812,6 +812,10 @@ Question selection rules:
 - adapt to user segment and clarity level
 - ask for evidence where claims are too soft
 - stop when sufficiently clear, not when merely plausible
+- accept that users may answer shortly, at medium length, or very fully
+- treat answer style itself as a potentially useful profiling signal
+- do not impose restrictive short-answer behavior as a product rule
+- if the user makes a real but vague attempt, respond with supportive scaffolding rather than simple blocking
 
 Good question quality means:
 
