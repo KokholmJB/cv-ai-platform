@@ -59,6 +59,9 @@ type InterviewCoverage = {
   workStyleFit: boolean;
   mismatchRisk: boolean;
   evidenceDepth: boolean;
+  concreteEvidence: boolean;
+  ownershipScope: boolean;
+  resultEvidence: boolean;
   motivationFit: boolean;
   domainContext: boolean;
   noGoClarity: boolean;
@@ -222,6 +225,9 @@ const emptyInterviewState: InterviewState = {
     workStyleFit: false,
     mismatchRisk: false,
     evidenceDepth: false,
+    concreteEvidence: false,
+    ownershipScope: false,
+    resultEvidence: false,
     motivationFit: false,
     domainContext: false,
     noGoClarity: false,

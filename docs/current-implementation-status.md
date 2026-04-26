@@ -75,6 +75,8 @@ This must be addressed before the interview engine can be considered done by the
 - the engine still needs stronger balanced coverage of branch or domain context, evidence depth, concrete cases or results, motivation or no-go conditions, and profile-strength-versus-goal-level
 - interviewState and completion hardening now include broader coverage dimensions such as domain context, no-go clarity, and profile-strength-gap signals
 - completion now requires broader coverage than before, not mainly role, level, and direction
+- interview evidence-depth hardening now tracks `concreteEvidence`, `ownershipScope`, and `resultEvidence`
+- completion now requires stronger practical evidence than before, not only broad profile positioning
 - interview flow reliability hardening is now implemented
 - backend now retries certain recoverable interview-generation failures internally before returning an error
 - frontend now prevents duplicate rapid-fire submits while an interview request is already in flight
@@ -85,6 +87,16 @@ This must be addressed before the interview engine can be considered done by the
 - low-quality-answer handling has been added as a controlled fallback before model retries are used
 - low-quality-answer handling was too aggressive and is now being narrowed to true filler or junk detection only
 - substantive Danish answers with real work, domain, responsibility, or motivation detail should now pass the guard
+- `INVALID_MODEL_OUTPUT` diagnosis has now been split into more specific backend reason codes
+- development logging now gives compact sanitized visibility into failed model output validation
+- this is still a debugging aid, not a final product feature
+- focusArea normalization has been added to reduce near-miss invalid focusArea failures
+- the public `focusArea` contract is unchanged
+- broader interview coverage still maps into the original controlled `focusArea` enum
+- insufficient-coverage completion attempts now recover into targeted follow-up questions
+- this reduces user-facing failure when the model tries to complete too early
+- evidence saturation and anti-circling logic has now been added
+- repeated case, responsibility, and result probing should now recover toward other missing areas instead of looping
 
 ## Interview Progress And Resume Requirement
 
