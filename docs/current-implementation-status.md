@@ -97,6 +97,12 @@ This must be addressed before the interview engine can be considered done by the
 - this reduces user-facing failure when the model tries to complete too early
 - evidence saturation and anti-circling logic has now been added
 - repeated case, responsibility, and result probing should now recover toward other missing areas instead of looping
+- complete now returns a separate readiness and profile-quality assessment
+- the system can now distinguish between completed interview status and target-readiness strength
+- this readiness still does not yet include uploaded document or evidence intake
+- restrictive short-answer behavior is not acceptable as the product rule
+- long raw answers are now accepted in the active interview flow
+- vague or weak real-attempt answers should now trigger adaptive interviewing and scaffolding rather than simple blocking
 
 ## Interview Progress And Resume Requirement
 

@@ -103,24 +103,35 @@ type ProfileSummary = {
   };
 };
 
+type ReadinessAssessment = {
+  level: "minimum_usable" | "stronger_profile" | "not_strong_enough_for_target";
+  targetDirectionSupport: "partial" | "strong" | "not_yet_proven";
+  summary: string;
+  strengthSignals: string[];
+  gapSignals: string[];
+};
+
 type InterviewResult =
   | {
       status: "idle";
       question: null;
       focusArea: null;
       profileSummary: null;
+      readinessAssessment: null;
     }
   | {
       status: "continue";
       question: string;
       focusArea: FocusArea;
       profileSummary: null;
+      readinessAssessment: null;
     }
   | {
       status: "complete";
       question: null;
       focusArea: null;
       profileSummary: ProfileSummary;
+      readinessAssessment: ReadinessAssessment;
     };
 
 const steps: { id: StepId; label: string; eyebrow: string; title: string }[] = [
@@ -292,6 +303,32 @@ function formatConfidenceLabel(confidence: ConfidenceLevel) {
   }
 }
 
+function formatReadinessLevelLabel(level: ReadinessAssessment["level"]) {
+  switch (level) {
+    case "stronger_profile":
+      return "Stærk profil";
+    case "not_strong_enough_for_target":
+      return "Endnu ikke stærk nok til målretningen";
+    case "minimum_usable":
+    default:
+      return "Brugbar profil";
+  }
+}
+
+function formatTargetDirectionSupportLabel(
+  targetDirectionSupport: ReadinessAssessment["targetDirectionSupport"],
+) {
+  switch (targetDirectionSupport) {
+    case "strong":
+      return "Stærkt understøttet";
+    case "not_yet_proven":
+      return "Endnu ikke bevist";
+    case "partial":
+    default:
+      return "Delvist understøttet";
+  }
+}
+
 function getInterviewErrorMessage(reasonCode?: InterviewReasonCode) {
   switch (reasonCode) {
     case "LOW_QUALITY_ANSWER":
@@ -320,6 +357,7 @@ export function SetupFlow() {
     question: null,
     focusArea: null,
     profileSummary: null,
+    readinessAssessment: null,
   });
   const [interviewAnswer, setInterviewAnswer] = useState("");
   const [interviewErrorMessage, setInterviewErrorMessage] = useState<string | null>(null);
@@ -420,6 +458,7 @@ export function SetupFlow() {
             status: "complete";
             profileSummary: ProfileSummary;
             interviewState: InterviewState;
+            readinessAssessment: ReadinessAssessment;
           }
         | {
             ok: false;
@@ -460,6 +499,7 @@ export function SetupFlow() {
           question: null,
           focusArea: null,
           profileSummary: data.profileSummary,
+          readinessAssessment: data.readinessAssessment,
         });
         setInterviewAnswer("");
         return;
@@ -471,6 +511,7 @@ export function SetupFlow() {
         question: data.question,
         focusArea: data.focusArea,
         profileSummary: null,
+        readinessAssessment: null,
       });
       setInterviewAnswer("");
     } catch {
@@ -498,6 +539,7 @@ export function SetupFlow() {
       question: null,
       focusArea: null,
       profileSummary: null,
+      readinessAssessment: null,
     });
     await requestInterviewTurn(null, null);
   }
@@ -510,7 +552,7 @@ export function SetupFlow() {
     const trimmedAnswer = interviewAnswer.trim();
 
     if (!trimmedAnswer) {
-      setInterviewErrorMessage("Skriv et kort svar for at fortsætte.");
+      setInterviewErrorMessage("Skriv et svar for at fortsætte.");
       setInterviewErrorReasonCode(null);
       setInterviewLastFailureReasonCode(null);
       setInterviewRetryTrail([]);
@@ -520,7 +562,7 @@ export function SetupFlow() {
     await requestInterviewTurn(interviewResult.question, trimmedAnswer);
   }
 
-  function renderCompleteSummary(profileSummary: ProfileSummary) {
+  function renderCompleteSummary(profileSummary: ProfileSummary, readinessAssessment: ReadinessAssessment) {
     return (
       <div className="mt-6 space-y-5">
         <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
@@ -571,6 +613,29 @@ export function SetupFlow() {
             }
           />
         </div>
+
+        <div className="rounded-[1.25rem] border border-slate-200 bg-white p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Vurdering af profilstyrke
+          </p>
+          <div className="mt-4 grid gap-5 lg:grid-cols-2">
+            <SummaryCard
+              title="Samlet vurdering"
+              items={[
+                ["Profilstyrke", formatReadinessLevelLabel(readinessAssessment.level)],
+                ["Understøttelse af målretning", formatTargetDirectionSupportLabel(readinessAssessment.targetDirectionSupport)],
+                ["Vurdering", readinessAssessment.summary],
+              ]}
+            />
+            <SummaryCard
+              title="Styrker og mangler"
+              items={[
+                ["Stærke signaler", readinessAssessment.strengthSignals.join(" · ")],
+                ["Huller i profilen", readinessAssessment.gapSignals.join(" · ")],
+              ]}
+            />
+          </div>
+        </div>
       </div>
     );
   }
@@ -613,6 +678,9 @@ export function SetupFlow() {
               onChange={setInterviewAnswer}
               rows={4}
             />
+            <p className="text-sm leading-6 text-slate-500">
+              Du må gerne svare kort eller langt. Konkrete eksempler hjælper. Hvis du er i tvivl, så beskriv situationen, dit ansvar og hvad resultatet blev.
+            </p>
 
             <div className="flex justify-end">
               <button
@@ -627,8 +695,8 @@ export function SetupFlow() {
           </div>
         ) : null}
 
-        {interviewResult.status === "complete" && interviewResult.profileSummary
-          ? renderCompleteSummary(interviewResult.profileSummary)
+        {interviewResult.status === "complete" && interviewResult.profileSummary && interviewResult.readinessAssessment
+          ? renderCompleteSummary(interviewResult.profileSummary, interviewResult.readinessAssessment)
           : null}
 
         {interviewErrorMessage ? (
