@@ -309,6 +309,84 @@ const manualPersonas: ManualPersona[] = [
     suspiciousEarlyTurns: 2,
   },
   {
+    id: "manual-specialist-technical-leadership",
+    description:
+      "User wants to remain a specialist but have technical/faglig leadership, mentoring and standards responsibility without formal personnel management.",
+    profileDraft: {
+      name: "Nina",
+      currentRole: "Senior data specialist",
+      yearsExperience:
+        "12 aar med dataplatforme, analysemodeller, rapportstandarder, kvalitetssikring og faglig sparring.",
+      targetDirection:
+        "Jeg vil gerne have mere fagligt ansvar og maaske vaere lead specialist, men jeg vil ikke have formelt personaleansvar.",
+    },
+    answerStrategy: {
+      defaultAnswers: [
+        "Jeg vil gerne vaere den andre kan spoerge, lave standarder og reviewe loesninger, men ikke holde MUS eller ansaette folk.",
+        "Jeg vil stadig selv bygge modeller og vaere taet paa data, ikke kun koordinere andres arbejde.",
+      ],
+      byFamily: {
+        ownership:
+          "Jeg har ejet rapportstandarder, datakvalitet og review af modeller, og kolleger kommer til mig for faglige valg.",
+        responsibility:
+          "For mig betyder ledelse faglig retning, mentoring og standarder, ikke personaleansvar eller HR-opgaver.",
+        resultEvidence:
+          "Et konkret resultat var faerre fejl i rapporteringen og hurtigere onboarding, fordi vi fik faelles standarder og review.",
+        mismatch_risk:
+          "Et daarligt match er en rolle hvor technical lead bare betyder personalechef eller moedeleder uden faglig fordybelse.",
+        product_ownership:
+          "Det handler ikke om product ownership. Det handler om datafaglige standarder, kvalitet og beslutningsstoette.",
+        domain_context:
+          "Jeg har mest arbejdet i data- og analysefunktioner med interne fagteams, ledelsesrapportering og dataplatforme.",
+      },
+      byFocusArea: {
+        current_work_reality:
+          "Min hverdag er dataplatforme, analysemodeller, rapportstandarder, kvalitetssikring og sparring med analytikere.",
+        work_style_fit:
+          "Jeg trives med hands-on problemlosning, faglig sparring, review af modeller og tydelige standarder.",
+        mismatch_risk:
+          "Jeg vil undgaa en rolle hvor lead betyder personalechef, mange HR-opgaver og mindre tid til faglighed.",
+        level_seniority:
+          "Jeg vil gerne vaere lead specialist med faglig beslutningspaavirkning, men uden personaleansvar.",
+        transferable_strengths:
+          "Mine styrker er datamodellering, kvalitet, standarder og at goere andre bedre gennem faglig sparring.",
+        direction_change:
+          "Det er ikke et skift vaek fra specialistsporet. Det er mere technical lead og faglig ledelse oven paa specialistarbejdet.",
+      },
+    },
+    expectedProductBehaviorNotes: [
+      "Should distinguish faglig ledelse from personaleledelse.",
+      "Should not treat all leadership as unwanted.",
+      "Should ask about technical responsibility, standards, mentoring, decision influence and hands-on depth.",
+      "Should preserve the user as a specialist or technical lead profile, not force them into people manager or pure individual contributor.",
+    ],
+    reviewChecklist: [
+      "Did it separate faglig ledelse from formal personnel management?",
+      "Did it preserve technical leadership as a valid specialist direction?",
+      "Did it ask about standards, mentoring, decision influence and hands-on depth?",
+      "Does the final profile avoid flattening the user into either people manager or pure individual contributor?",
+    ],
+    driftPatterns: [
+      {
+        label: "possible people-management push",
+        pattern:
+          /(vil du|onsker du|naeste skridt|bevaege dig mod).{0,90}(personaleansvar|people manager|leder for medarbejdere|personalechef)/iu,
+      },
+      {
+        label: "possible flattening into no leadership at all",
+        pattern:
+          /ingen ledelse|ikke nogen form for ledelse|helt uden faglig ledelse|ren individual contributor|pure individual contributor|kun individuel specialist/iu,
+      },
+      {
+        label: "possible ignored technical/faglig leadership",
+        pattern:
+          /ikke technical lead|ikke faglig lead|undga fagligt ansvar|fravalg af faglig ledelse|kun hands-on uden sparring|ingen standardansvar/iu,
+      },
+    ],
+    needsUncertainty: false,
+    suspiciousEarlyTurns: 2,
+  },
+  {
     id: "manual-product-transition-gap",
     description:
       "User wants to move from project or delivery coordination toward product work, but evidence is mixed and gaps need realistic handling.",
