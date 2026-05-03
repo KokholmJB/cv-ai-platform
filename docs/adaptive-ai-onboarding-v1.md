@@ -80,6 +80,15 @@ Collect a universal minimum. Expand only where uncertainty affects job evaluatio
 
 This hybrid model must eventually include a document and evidence intake layer. Adaptive interviewing is not sufficient on its own if the system ignores serious user-provided material that already contains facts, credentials, examples, or evidence gaps.
 
+The interview logic should therefore move toward:
+
+- documents and structured evidence first, questions second
+- explicit separation between facts, interpretations, and unresolved uncertainty
+- hypothesis-driven profiling rather than simple question sequencing
+- fewer, heavier questions that materially improve the profile model
+
+The user's stated ambition, identity, or preferred title should be treated as an important signal, but not as proof. The system must compare self-claim with current evidence and ask where the gap matters.
+
 ## 3. Universal profile dimensions
 
 These dimensions should exist for all users regardless of profession. They form the common language JobPilot uses to score jobs, personalize outputs, preserve context over time, and later compare the user profile against changing market conditions.
@@ -258,6 +267,8 @@ Operational use:
 - improves CV/application personalization
 - makes AI outputs feel like the user rather than template content
 - helps the system tune question phrasing and support level
+- short versus long answer style can itself be a useful signal
+- evidence density and structure level can later help JobPilot choose how much scaffolding or sharpening the user needs
 
 ### Interview and story foundation
 

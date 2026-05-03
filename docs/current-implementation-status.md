@@ -70,6 +70,10 @@ This must be addressed before the interview engine can be considered done by the
 ## Active Interview Hardening Notes
 
 - plain Danish wording is now an explicit interview-engine requirement
+- an internal interview scenario test harness now exists under `tests/interview-scenarios/`
+- it covers multiple job segments and user intentions, including same-track users, better-conditions users, specialists, managers, unclear-direction users, career changers, and users wanting less responsibility
+- the harness checks loop behavior, progress behavior, repeated focus areas, repeated semantic question families, and intention-first behavior
+- this harness is a development visibility tool, not a full production QA system yet
 - interview questions should avoid English career jargon and internal HR or product language unless the user's own profile clearly justifies it
 - broader coverage beyond role, level, strengths, and direction remains part of the active interview-engine hardening work
 - the engine still needs stronger balanced coverage of branch or domain context, evidence depth, concrete cases or results, motivation or no-go conditions, and profile-strength-versus-goal-level
@@ -103,6 +107,39 @@ This must be addressed before the interview engine can be considered done by the
 - restrictive short-answer behavior is not acceptable as the product rule
 - long raw answers are now accepted in the active interview flow
 - vague or weak real-attempt answers should now trigger adaptive interviewing and scaffolding rather than simple blocking
+- interview progress and threshold UI is now implemented in the active setup flow
+- it distinguishes between early progress, minimum usable, stronger profile, and complete
+- it is still based on current `interviewState` and readiness logic only
+- progress UI has now been refined for clearer threshold visibility during the live interview
+- the progress threshold labels are now Basis, Avanceret, and Færdig
+- the helper text now explains more clearly when JobPilot can be used and why continuing improves quality
+- short but meaningful answers are now treated as valid interview input or guided recovery instead of junk
+- junk-answer rejection is now more polite and helpful in tone
+- reached milestone styling in the progress UI now updates correctly as thresholds are passed
+- progress fill has been tuned to feel more intuitive around the Basis threshold
+- insufficient-coverage completion attempts should now recover more reliably into follow-up questions instead of surfacing as user-facing retry exhaustion
+- semantic loop protection now covers no-go and mismatch repetition more reliably
+- progress smoothing has been improved and 95% plateau behavior has been reduced
+- milestone reached-state styling now updates more reliably when thresholds are crossed
+- the current manually adjusted color scale was intentionally left unchanged
+- the interview route now builds a lightweight internal profile model with facts, interpretations, uncertainties, and explicit hypotheses
+- the engine now treats target direction and other self-claims separately from current proven evidence when choosing the next question and judging readiness
+- question recovery is now increasingly guided by unresolved hypothesis and evidence gaps instead of only shallow focus-area continuation
+- lightweight communication signals such as concise versus detailed style and evidence density are now tracked as internal signals, not as facts
+- the route is now more clearly prepared for documents-first evidence intake, but real document parsing and persistence are still not implemented
+- progress percent, fill width, and stage logic are now aligned more tightly from the same active progress state
+- progress should no longer visually overstate completion before Basis or Avanceret is actually reached
+- mismatch_risk and no-go semantic-family saturation has now been strengthened again
+- repeated avoid, bad-match, and poor-fit paraphrase loops should now redirect or complete more reliably
+- mismatch/no-go and target-gap families are now handled more distinctly instead of acting like one shared paraphrase pool
+- progress is now driven more by evidence delta and accumulated new evidence than by repeated turns alone
+- mid-range progress stagnation has been reduced when strong new evidence is added
+- saturated mismatch families should now redirect or complete more reliably instead of circling in paraphrases
+- ownership and product-decision repetition is now treated as its own saturated family instead of being mixed too loosely with general mismatch or level questions
+- level or scope, formal product ownership, target-gap, and direction-change realism are now handled more distinctly in the interview route
+- repeated mid-range stalls caused by ownership-family paraphrases should now be reduced because strong clarifying evidence can move progress or trigger redirect more clearly
+- once ownership or product-authority evidence is well covered, the engine should redirect or complete more reliably instead of re-asking nearby paraphrases
+- pause and resume across closed browser, browser, or device sessions is still not implemented
 
 ## Interview Progress And Resume Requirement
 
@@ -185,13 +222,14 @@ Additional design implications:
 - it uses strict JSON parsing and validation for model output
 - it can now return either `status: "continue"` or `status: "complete"`
 - it can return a structured `profileSummary` on completion
+- it can now also return a compact internal `profileModel`, `hypothesisSummary`, `uncertaintySummary`, and `communicationSignals` on completion
 - it includes a simple repetition guard against near-duplicate same-focus follow-up questions
 - the `/setup` UI can start the interview, continue one additional turn, and render the completed phase-1 profile summary
 - interview state is currently carried only within the active frontend session
 - failed interview generation now returns a compact `reasonCode` after internal retries are exhausted
 - it does not yet persist interview state
 - it does not yet satisfy the stricter coverage, completion-gate, and segment-robustness requirements defined for Interview Engine v1
-- it does not yet account for uploaded or pre-collected evidence quality as part of interview sufficiency
+- it does not yet account for uploaded or pre-collected evidence quality through real document parsing as part of interview sufficiency
 - plain-Danish wording and broader coverage balancing are now part of the active interview-engine hardening work
 - document and evidence-aware intake is still not implemented
 

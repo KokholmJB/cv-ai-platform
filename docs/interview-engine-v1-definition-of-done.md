@@ -112,6 +112,50 @@ This means the interview engine should later operate on two inputs:
 
 The interview engine must not ask generic clarification questions if the uploaded material already answers them clearly. It must use the intake layer to understand what is already known and what still needs proof, sharpening, or reconciliation.
 
+## 3A. Hypothesis-Driven Profiling Requirement
+
+The Interview Engine must not behave like a simple question list.
+
+It must internally work with at least four distinct layers:
+
+- facts
+- interpretations
+- uncertainties
+- hypotheses
+
+This means:
+
+- direct user claims and target direction are not proof on their own
+- the engine should separate self-description from supported evidence
+- the engine should form explicit working hypotheses about fit, level, transferability, and transition realism
+- the engine should ask the next question that most reduces a high-value uncertainty or tests an unresolved hypothesis
+
+The engine should prefer a few heavy questions over many light ones.
+
+It should ask:
+
+- what is still materially unclear
+- what claim is not yet well supported
+- what evidence would most change readiness or role-fit interpretation
+
+It should not ask another question merely because a focus-area sequence says so.
+
+## 3B. Communication Signals As Secondary Evidence
+
+Communication style is not the main profiling goal, but it is a real signal.
+
+The engine should later be able to track lightweight internal signals such as:
+
+- concise versus detailed answer style
+- low versus high structure
+- low versus high evidence density
+- possible self-minimizing language
+- possible overlong explanations
+
+These are signals, not facts.
+
+They should influence later interviewing and downstream writing support, but they must not be confused with proof of fit or level.
+
 ## 4. Required Profiling Dimensions
 
 The engine must not complete until it has clarified a phase-1 minimum across the dimensions below. These are not optional nice-to-haves. They are the profiling core.
