@@ -59,13 +59,25 @@ type InterviewEvidenceCounts = {
   concreteEvidenceCount: number;
   ownershipScopeCount: number;
   resultEvidenceCount: number;
+  noGoClarityCount: number;
+  profileStrengthGapCount: number;
+  productOwnershipEvidenceCount: number;
+};
+
+type EvidenceDeltaCategory = "none" | "modest" | "strong";
+
+type InterviewProgressMeta = {
+  evidenceScore: number;
+  lastEvidenceDelta: EvidenceDeltaCategory;
 };
 
 type InterviewState = {
   answeredTurns: number;
   coveredFocusAreas: FocusArea[];
+  recentQuestions: { question: string; focusArea: FocusArea }[];
   coverage: InterviewCoverage;
   evidenceCounts: InterviewEvidenceCounts;
+  progressMeta: InterviewProgressMeta;
 };
 
 type ProfileSummary = {
@@ -97,6 +109,93 @@ type ReadinessAssessment = {
   gapSignals: string[];
 };
 
+type EvidenceSourceKey =
+  | "profile_draft"
+  | "interview_answers"
+  | "structured_summary"
+  | "cv"
+  | "linkedin"
+  | "job_history"
+  | "applications"
+  | "certificates"
+  | "notes"
+  | "feedback";
+
+type EvidenceSourceState = {
+  key: EvidenceSourceKey;
+  label: string;
+  available: boolean;
+  readiness: "current" | "future_placeholder";
+  strength: "none" | "light" | "strong";
+};
+
+type ProfileFact = {
+  key: string;
+  statement: string;
+  evidenceLevel: "explicit" | "supported";
+  sources: EvidenceSourceKey[];
+};
+
+type ProfileInterpretation = {
+  key: string;
+  statement: string;
+  confidence: ConfidenceLevel;
+  evidenceSignals: string[];
+};
+
+type ProfileUncertainty = {
+  key: string;
+  statement: string;
+  impact: "medium" | "high";
+  focusArea: FocusArea;
+  unresolved: boolean;
+};
+
+type Hypothesis = {
+  key: string;
+  statement: string;
+  supportLevel: "low" | "medium" | "high";
+  contradictionLevel: "none" | "low" | "medium";
+  confidence: ConfidenceLevel;
+  evidenceSignals: string[];
+  unresolved: boolean;
+};
+
+type CommunicationSignals = {
+  answerStyle: "concise" | "balanced" | "detailed";
+  structureLevel: "low" | "medium" | "high";
+  evidenceDensity: "low" | "medium" | "high";
+  possibleSelfMinimizingLanguage: boolean;
+  possibleOverlongExplanations: boolean;
+};
+
+type QuestionPriority = {
+  key: string;
+  statement: string;
+  question: string;
+  focusArea: FocusArea;
+  score: number;
+  reason: string;
+  unresolved: boolean;
+};
+
+type InterviewProfileModel = {
+  evidenceSources: EvidenceSourceState[];
+  facts: ProfileFact[];
+  interpretations: ProfileInterpretation[];
+  uncertainties: ProfileUncertainty[];
+  hypotheses: Hypothesis[];
+  questionPriorities: QuestionPriority[];
+  communicationSignals: CommunicationSignals;
+};
+
+type HypothesisSummaryItem = Pick<
+  Hypothesis,
+  "key" | "statement" | "confidence" | "supportLevel" | "contradictionLevel" | "unresolved"
+>;
+
+type UncertaintySummaryItem = Pick<ProfileUncertainty, "key" | "statement" | "impact" | "focusArea">;
+
 type ErrorPayload = {
   ok: false;
   error: string;
@@ -120,6 +219,10 @@ type GenerateSuccess =
       profileSummary: ProfileSummary;
       interviewState: InterviewState;
       readinessAssessment: ReadinessAssessment;
+      profileModel: InterviewProfileModel;
+      hypothesisSummary: HypothesisSummaryItem[];
+      uncertaintySummary: UncertaintySummaryItem[];
+      communicationSignals: CommunicationSignals;
     };
 
 type GenerateFailure = {
@@ -130,6 +233,16 @@ type GenerateFailure = {
 };
 
 type AnswerQuality = "junk_or_testlike" | "vague_but_real_attempt" | "substantive_answer";
+type TargetProfileKind =
+  | "same_track"
+  | "same_track_better_conditions"
+  | "next_level"
+  | "direction_change"
+  | "product_transition"
+  | "unclear"
+  | "less_responsibility"
+  | "specialist_track";
+type SaturationFamily = "current_work_reality" | "resultEvidence" | "responsibility" | "mismatch_risk" | "ownership";
 
 function isShortString(value: unknown, maxLength = 300): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
@@ -262,6 +375,7 @@ function createEmptyInterviewState(): InterviewState {
   return {
     answeredTurns: 0,
     coveredFocusAreas: [],
+    recentQuestions: [],
     coverage: {
       currentWorkReality: false,
       levelSeniority: false,
@@ -282,6 +396,13 @@ function createEmptyInterviewState(): InterviewState {
       concreteEvidenceCount: 0,
       ownershipScopeCount: 0,
       resultEvidenceCount: 0,
+      noGoClarityCount: 0,
+      profileStrengthGapCount: 0,
+      productOwnershipEvidenceCount: 0,
+    },
+    progressMeta: {
+      evidenceScore: 0,
+      lastEvidenceDelta: "none",
     },
   };
 }
@@ -309,8 +430,22 @@ function inferAnswerQuality(value: string): AnswerQuality {
     hasProfileStrengthGapSignal(value),
   ].filter(Boolean).length;
 
+  const shortButMeaningfulSignals = [
+    hasDomainContextSignal(value),
+    hasMotivationSignal(value),
+    hasOwnershipScopeSignal(value),
+    hasProfileStrengthGapSignal(value),
+    /projektledelse|marketing|saas|b2b|service|fejlfinding|koordinering|ansvar|drift|produktion|salg|support/iu.test(
+      value,
+    ),
+  ].filter(Boolean).length;
+
   if (tokens.length >= 12 || clauseCount >= 2 || supportiveSignals >= 2) {
     return "substantive_answer";
+  }
+
+  if (tokens.length >= 3 && shortButMeaningfulSignals >= 1) {
+    return "vague_but_real_attempt";
   }
 
   return "vague_but_real_attempt";
@@ -320,21 +455,21 @@ function getLowQualityReason(value: string) {
   const normalized = normalizeText(value);
   const tokens = normalized.split(" ").filter(Boolean);
   const uniqueTokens = new Set(tokens);
+  const hasMeaningfulSignal =
+    hasConcreteEvidenceSignal(value) ||
+    hasMotivationSignal(value) ||
+    hasDomainContextSignal(value) ||
+    hasNoGoSignal(value) ||
+    hasProfileStrengthGapSignal(value) ||
+    hasOwnershipScopeSignal(value) ||
+    /projektledelse|marketing|saas|b2b|service|fejlfinding|koordinering|ansvar|drift|produktion|salg|support/iu.test(
+      value,
+    );
 
   if (tokens.length >= 8) {
-    if (
-      hasConcreteEvidenceSignal(value) ||
-      hasMotivationSignal(value) ||
-      hasDomainContextSignal(value) ||
-      hasNoGoSignal(value) ||
-      hasProfileStrengthGapSignal(value)
-    ) {
+    if (hasMeaningfulSignal) {
       return null;
     }
-  }
-
-  if (tokens.length <= 2) {
-    return "TOO_SHORT";
   }
 
   const lowValuePhrases = [
@@ -363,6 +498,14 @@ function getLowQualityReason(value: string) {
 
   if (/^\d+$/.test(normalized)) {
     return "NUMERIC_FILLER";
+  }
+
+  if (tokens.length >= 3 && hasMeaningfulSignal) {
+    return null;
+  }
+
+  if (tokens.length <= 2) {
+    return "TOO_SHORT";
   }
 
   if (tokens.length <= 4 && lowValuePhrases.some((phrase) => normalized.includes(phrase))) {
@@ -613,6 +756,62 @@ function normalizeText(value: string) {
     .trim();
 }
 
+function inferTargetProfileKind(profileDraft: ProfileDraft): TargetProfileKind {
+  const target = normalizeText(profileDraft.targetDirection ?? "");
+  const currentRole = normalizeText(profileDraft.currentRole ?? "");
+  const combined = `${currentRole} ${target}`.trim();
+
+  if (["ved ikke", "usikker", "ikke helt hvad", "afklare", "uklar"].some((keyword) => target.includes(keyword))) {
+    return "unclear";
+  }
+
+  if (
+    ["mindre ansvar", "lavere pres", "bedre balance", "uden topansvar", "roligere", "mindre pres"].some((keyword) =>
+      target.includes(keyword),
+    )
+  ) {
+    return "less_responsibility";
+  }
+
+  if (
+    ["product manager", "product owner", "produktejer", "produktleder"].some((keyword) => target.includes(keyword)) &&
+    ["projekt", "project"].some((keyword) => currentRole.includes(keyword) || combined.includes(keyword))
+  ) {
+    return "product_transition";
+  }
+
+  if (
+    ["specialist", "faglig", "ekspert"].some((keyword) => target.includes(keyword) || currentRole.includes(keyword)) &&
+    ["ikke blive people manager", "ikke people manager", "ikke personaleansvar", "uden personaleansvar"].some((keyword) =>
+      target.includes(keyword),
+    )
+  ) {
+    return "specialist_track";
+  }
+
+  if (
+    ["skifte", "vaek fra", "væk fra", "overgang", "ny retning", "health tech", "sundhedsadministration"].some((keyword) =>
+      target.includes(keyword),
+    )
+  ) {
+    return "direction_change";
+  }
+
+  if (["mere ledelsesansvar", "storre afdeling", "større afdeling", "naeste niveau", "næste niveau"].some((keyword) => target.includes(keyword))) {
+    return "next_level";
+  }
+
+  if (["samme", "lignende", "blive i", "bedre virksomhed", "bedre leder", "bedre manager", "stabile"].some((keyword) => target.includes(keyword))) {
+    return "same_track_better_conditions";
+  }
+
+  return "same_track";
+}
+
+function isStrictCompletionKind(kind: TargetProfileKind) {
+  return kind === "unclear" || kind === "direction_change" || kind === "product_transition" || kind === "less_responsibility";
+}
+
 function getMeaningfulTokens(value: string) {
   const stopWords = new Set([
     "hvad",
@@ -749,6 +948,18 @@ function incrementEvidenceCount(count: number) {
   return Math.min(count + 1, 2);
 }
 
+function incrementNoGoCount(count: number) {
+  return Math.min(count + 1, 2);
+}
+
+function incrementProfileStrengthGapCount(count: number) {
+  return Math.min(count + 1, 2);
+}
+
+function incrementProductOwnershipEvidenceCount(count: number) {
+  return Math.min(count + 1, 2);
+}
+
 function normalizeInterviewState(value: unknown): InterviewState {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return createEmptyInterviewState();
@@ -767,6 +978,16 @@ function normalizeInterviewState(value: unknown): InterviewState {
   const coveredFocusAreas = Array.isArray(candidate.coveredFocusAreas)
     ? candidate.coveredFocusAreas.filter(isFocusArea)
     : [];
+  const recentQuestions = Array.isArray(candidate.recentQuestions)
+    ? candidate.recentQuestions
+        .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+        .map((item) => ({
+          question: typeof item.question === "string" ? item.question.trim().slice(0, 300) : "",
+          focusArea: normalizeFocusArea(item.focusArea),
+        }))
+        .filter((item): item is { question: string; focusArea: FocusArea } => item.question.length > 0 && Boolean(item.focusArea))
+        .slice(-12)
+    : [];
 
   return {
     answeredTurns:
@@ -774,6 +995,7 @@ function normalizeInterviewState(value: unknown): InterviewState {
         ? candidate.answeredTurns
         : 0,
     coveredFocusAreas,
+    recentQuestions,
     coverage: {
       currentWorkReality: coverageCandidate.currentWorkReality === true,
       levelSeniority: coverageCandidate.levelSeniority === true,
@@ -803,7 +1025,51 @@ function normalizeInterviewState(value: unknown): InterviewState {
         typeof evidenceCountsCandidate.resultEvidenceCount === "number"
           ? Math.max(0, Math.min(2, Math.floor(evidenceCountsCandidate.resultEvidenceCount)))
           : 0,
+      noGoClarityCount:
+        typeof evidenceCountsCandidate.noGoClarityCount === "number"
+          ? Math.max(0, Math.min(2, Math.floor(evidenceCountsCandidate.noGoClarityCount)))
+          : 0,
+      profileStrengthGapCount:
+        typeof evidenceCountsCandidate.profileStrengthGapCount === "number"
+          ? Math.max(0, Math.min(2, Math.floor(evidenceCountsCandidate.profileStrengthGapCount)))
+          : 0,
+      productOwnershipEvidenceCount:
+        typeof evidenceCountsCandidate.productOwnershipEvidenceCount === "number"
+          ? Math.max(0, Math.min(2, Math.floor(evidenceCountsCandidate.productOwnershipEvidenceCount)))
+          : 0,
     },
+    progressMeta:
+      candidate.progressMeta && typeof candidate.progressMeta === "object" && !Array.isArray(candidate.progressMeta)
+        ? {
+            evidenceScore:
+              typeof (candidate.progressMeta as Record<string, unknown>).evidenceScore === "number"
+                ? Math.max(0, Math.min(100, Math.floor((candidate.progressMeta as Record<string, unknown>).evidenceScore as number)))
+                : 0,
+            lastEvidenceDelta:
+              (candidate.progressMeta as Record<string, unknown>).lastEvidenceDelta === "strong" ||
+              (candidate.progressMeta as Record<string, unknown>).lastEvidenceDelta === "modest" ||
+              (candidate.progressMeta as Record<string, unknown>).lastEvidenceDelta === "none"
+                ? ((candidate.progressMeta as Record<string, unknown>).lastEvidenceDelta as EvidenceDeltaCategory)
+                : "none",
+          }
+        : {
+            evidenceScore: 0,
+            lastEvidenceDelta: "none",
+          },
+  };
+}
+
+function appendRecentQuestion(interviewState: InterviewState, question: string, focusArea: FocusArea): InterviewState {
+  const normalizedQuestion = normalizeText(question);
+  const alreadyTracked = interviewState.recentQuestions.some((item) => normalizeText(item.question) === normalizedQuestion);
+
+  if (alreadyTracked) {
+    return interviewState;
+  }
+
+  return {
+    ...interviewState,
+    recentQuestions: [...interviewState.recentQuestions, { question: question.trim(), focusArea }].slice(-12),
   };
 }
 
@@ -818,79 +1084,118 @@ function updateInterviewState({
   lastUserAnswer: string | null;
   profileSummary?: ProfileSummary;
 }) {
+  const priorCoverageCount = Object.values(interviewState.coverage).filter(Boolean).length;
+  const priorEvidenceCountTotal =
+    interviewState.evidenceCounts.concreteEvidenceCount +
+    interviewState.evidenceCounts.ownershipScopeCount +
+    interviewState.evidenceCounts.resultEvidenceCount +
+    interviewState.evidenceCounts.noGoClarityCount +
+    interviewState.evidenceCounts.profileStrengthGapCount +
+    interviewState.evidenceCounts.productOwnershipEvidenceCount;
   const nextState: InterviewState = {
     answeredTurns: interviewState.answeredTurns,
     coveredFocusAreas: [...interviewState.coveredFocusAreas],
+    recentQuestions: [...interviewState.recentQuestions],
     coverage: { ...interviewState.coverage },
     evidenceCounts: { ...interviewState.evidenceCounts },
+    progressMeta: { ...interviewState.progressMeta },
   };
 
-  if (!lastAssistantQuestion || !lastUserAnswer || !hasSubstantiveAnswer(lastUserAnswer)) {
-    return nextState;
+  if (lastAssistantQuestion && lastUserAnswer) {
+    const priorFocusArea = inferFocusAreaFromQuestion(lastAssistantQuestion);
+
+    if (priorFocusArea) {
+      const normalizedQuestion = normalizeText(lastAssistantQuestion);
+      const alreadyTracked = nextState.recentQuestions.some((item) => normalizeText(item.question) === normalizedQuestion);
+
+      if (!alreadyTracked) {
+        nextState.recentQuestions = [
+          ...nextState.recentQuestions,
+          { question: lastAssistantQuestion.trim(), focusArea: priorFocusArea },
+        ].slice(-12);
+      }
+    }
   }
 
-  const priorFocusArea = inferFocusAreaFromQuestion(lastAssistantQuestion);
+  if (lastAssistantQuestion && lastUserAnswer && hasSubstantiveAnswer(lastUserAnswer)) {
+    const priorFocusArea = inferFocusAreaFromQuestion(lastAssistantQuestion);
+    const priorQuestionFamily = inferQuestionFamily(lastAssistantQuestion, priorFocusArea ?? "current_work_reality");
 
-  nextState.answeredTurns += 1;
+    nextState.answeredTurns += 1;
 
-  if (priorFocusArea && !nextState.coveredFocusAreas.includes(priorFocusArea)) {
-    nextState.coveredFocusAreas.push(priorFocusArea);
-  }
+    if (priorFocusArea && !nextState.coveredFocusAreas.includes(priorFocusArea)) {
+      nextState.coveredFocusAreas.push(priorFocusArea);
+    }
 
-  if (priorFocusArea === "current_work_reality") {
-    nextState.coverage.currentWorkReality = true;
-  }
+    if (priorFocusArea === "current_work_reality") {
+      nextState.coverage.currentWorkReality = true;
+    }
 
-  if (priorFocusArea === "level_seniority") {
-    nextState.coverage.levelSeniority = true;
-  }
+    if (priorFocusArea === "level_seniority") {
+      nextState.coverage.levelSeniority = true;
+    }
 
-  if (priorFocusArea === "transferable_strengths") {
-    nextState.coverage.transferableStrengths = true;
-  }
+    if (priorFocusArea === "transferable_strengths") {
+      nextState.coverage.transferableStrengths = true;
+    }
 
-  if (priorFocusArea === "direction_change") {
-    nextState.coverage.directionOfChange = true;
-  }
+    if (priorFocusArea === "direction_change") {
+      nextState.coverage.directionOfChange = true;
+    }
 
-  if (priorFocusArea === "work_style_fit") {
-    nextState.coverage.workStyleFit = true;
-  }
+    if (priorFocusArea === "work_style_fit") {
+      nextState.coverage.workStyleFit = true;
+    }
 
-  if (priorFocusArea === "mismatch_risk") {
-    nextState.coverage.mismatchRisk = true;
-  }
+    if (priorFocusArea === "mismatch_risk") {
+      nextState.coverage.mismatchRisk = true;
+    }
 
-  if (hasConcreteEvidenceSignal(lastUserAnswer)) {
-    nextState.coverage.evidenceDepth = true;
-    nextState.coverage.concreteEvidence = true;
-    nextState.evidenceCounts.concreteEvidenceCount = incrementEvidenceCount(nextState.evidenceCounts.concreteEvidenceCount);
-  }
+    if (hasConcreteEvidenceSignal(lastUserAnswer)) {
+      nextState.coverage.evidenceDepth = true;
+      nextState.coverage.concreteEvidence = true;
+      nextState.evidenceCounts.concreteEvidenceCount = incrementEvidenceCount(nextState.evidenceCounts.concreteEvidenceCount);
+    }
 
-  if (hasOwnershipScopeSignal(lastUserAnswer)) {
-    nextState.coverage.ownershipScope = true;
-    nextState.evidenceCounts.ownershipScopeCount = incrementEvidenceCount(nextState.evidenceCounts.ownershipScopeCount);
-  }
+    if (hasOwnershipScopeSignal(lastUserAnswer)) {
+      nextState.coverage.ownershipScope = true;
+      nextState.evidenceCounts.ownershipScopeCount = incrementEvidenceCount(nextState.evidenceCounts.ownershipScopeCount);
+    }
 
-  if (hasResultEvidenceSignal(lastUserAnswer)) {
-    nextState.coverage.resultEvidence = true;
-    nextState.evidenceCounts.resultEvidenceCount = incrementEvidenceCount(nextState.evidenceCounts.resultEvidenceCount);
-  }
+    if (hasResultEvidenceSignal(lastUserAnswer)) {
+      nextState.coverage.resultEvidence = true;
+      nextState.evidenceCounts.resultEvidenceCount = incrementEvidenceCount(nextState.evidenceCounts.resultEvidenceCount);
+    }
 
-  if (hasMotivationSignal(lastUserAnswer)) {
-    nextState.coverage.motivationFit = true;
-  }
+    if (hasMotivationSignal(lastUserAnswer)) {
+      nextState.coverage.motivationFit = true;
+    }
 
-  if (hasDomainContextSignal(lastUserAnswer)) {
-    nextState.coverage.domainContext = true;
-  }
+    if (hasDomainContextSignal(lastUserAnswer)) {
+      nextState.coverage.domainContext = true;
+    }
 
-  if (hasNoGoSignal(lastUserAnswer)) {
-    nextState.coverage.noGoClarity = true;
-  }
+    if (hasNoGoSignal(lastUserAnswer)) {
+      nextState.coverage.noGoClarity = true;
+      nextState.evidenceCounts.noGoClarityCount = incrementNoGoCount(nextState.evidenceCounts.noGoClarityCount);
+    }
 
-  if (hasProfileStrengthGapSignal(lastUserAnswer)) {
-    nextState.coverage.profileStrengthGap = true;
+    if (hasProfileStrengthGapSignal(lastUserAnswer)) {
+      nextState.coverage.profileStrengthGap = true;
+      nextState.evidenceCounts.profileStrengthGapCount = incrementProfileStrengthGapCount(
+        nextState.evidenceCounts.profileStrengthGapCount,
+      );
+    }
+
+    if (
+      priorQuestionFamily === "productOwnershipEvidence" ||
+      hasProductOwnershipEvidenceSignal(lastUserAnswer) ||
+      hasProductOwnershipGapSignal(lastUserAnswer)
+    ) {
+      nextState.evidenceCounts.productOwnershipEvidenceCount = incrementProductOwnershipEvidenceCount(
+        nextState.evidenceCounts.productOwnershipEvidenceCount,
+      );
+    }
   }
 
   if (profileSummary) {
@@ -975,6 +1280,7 @@ function updateInterviewState({
       profileSummary.aiProfileCore.mismatchRisks.some((item) => hasNoGoSignal(item))
     ) {
       nextState.coverage.noGoClarity = true;
+      nextState.evidenceCounts.noGoClarityCount = Math.max(nextState.evidenceCounts.noGoClarityCount, 1);
     }
 
     if (
@@ -982,7 +1288,48 @@ function updateInterviewState({
       profileSummary.aiProfileCore.mismatchRisks.some((item) => hasProfileStrengthGapSignal(item))
     ) {
       nextState.coverage.profileStrengthGap = true;
+      nextState.evidenceCounts.profileStrengthGapCount = Math.max(nextState.evidenceCounts.profileStrengthGapCount, 1);
     }
+
+    if (
+      hasProductOwnershipEvidenceSignal(profileSummary.aiProfileCore.currentWorkReality) ||
+      hasProductOwnershipEvidenceSignal(profileSummary.aiProfileCore.levelSeniority) ||
+      hasProductOwnershipGapSignal(profileSummary.aiProfileCore.currentWorkReality)
+    ) {
+      nextState.evidenceCounts.productOwnershipEvidenceCount = Math.max(
+        nextState.evidenceCounts.productOwnershipEvidenceCount,
+        1,
+      );
+    }
+  }
+
+  const nextCoverageCount = Object.values(nextState.coverage).filter(Boolean).length;
+  const nextEvidenceCountTotal =
+    nextState.evidenceCounts.concreteEvidenceCount +
+    nextState.evidenceCounts.ownershipScopeCount +
+    nextState.evidenceCounts.resultEvidenceCount +
+    nextState.evidenceCounts.noGoClarityCount +
+    nextState.evidenceCounts.profileStrengthGapCount +
+    nextState.evidenceCounts.productOwnershipEvidenceCount;
+  const coverageDelta = nextCoverageCount - priorCoverageCount;
+  const evidenceDelta = nextEvidenceCountTotal - priorEvidenceCountTotal;
+
+  let lastEvidenceDelta: EvidenceDeltaCategory = "none";
+
+  if (coverageDelta >= 2 || evidenceDelta >= 2) {
+    lastEvidenceDelta = "strong";
+  } else if (coverageDelta >= 1 || evidenceDelta >= 1) {
+    lastEvidenceDelta = "modest";
+  }
+
+  nextState.progressMeta.lastEvidenceDelta = lastEvidenceDelta;
+  nextState.progressMeta.evidenceScore = Math.min(
+    100,
+    interviewState.progressMeta.evidenceScore + (lastEvidenceDelta === "strong" ? 8 : lastEvidenceDelta === "modest" ? 4 : 0),
+  );
+
+  if (process.env.NODE_ENV !== "production" && (lastAssistantQuestion || profileSummary)) {
+    console.debug(`[interview] evidence delta: ${lastEvidenceDelta}`);
   }
 
   return nextState;
@@ -1015,6 +1362,467 @@ function hasMinimumInterviewCoverage(interviewState: InterviewState) {
     practicalEvidenceCount >= 2 &&
     broaderCoverageCount >= 2
   );
+}
+
+function estimateVisibleInterviewProgress(interviewState: InterviewState) {
+  const coverageCount = Object.values(interviewState.coverage).filter(Boolean).length;
+  const focusBreadth = new Set(interviewState.coveredFocusAreas).size;
+
+  return Math.min(
+    99,
+    Math.round(
+      interviewState.answeredTurns * 5 +
+        coverageCount * 4 +
+        focusBreadth * 3 +
+        interviewState.progressMeta.evidenceScore / 2,
+    ),
+  );
+}
+
+function hasMinimumProvisionalProfileBasis({
+  profileDraft,
+  interviewState,
+  profileModel,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileModel: InterviewProfileModel;
+}) {
+  const hasRoleContext = Boolean(profileDraft.currentRole?.trim()) || interviewState.coverage.currentWorkReality;
+  const hasDirectionSignal = Boolean(profileDraft.targetDirection?.trim()) || interviewState.coverage.directionOfChange;
+  const hasLevelSignal =
+    Boolean(profileDraft.yearsExperience?.trim()) ||
+    interviewState.coverage.levelSeniority ||
+    interviewState.coverage.ownershipScope ||
+    profileModel.uncertainties.some((uncertainty) => uncertainty.focusArea === "level_seniority");
+  const hasEvidenceOrExplicitUncertainty =
+    interviewState.coverage.evidenceDepth ||
+    interviewState.coverage.concreteEvidence ||
+    interviewState.coverage.ownershipScope ||
+    interviewState.coverage.resultEvidence ||
+    profileModel.uncertainties.length > 0;
+  const hasFitOrNoGoSignal =
+    interviewState.coverage.workStyleFit ||
+    interviewState.coverage.mismatchRisk ||
+    interviewState.coverage.noGoClarity ||
+    interviewState.coverage.motivationFit ||
+    Boolean(profileDraft.targetDirection?.trim()) ||
+    interviewState.answeredTurns >= 4;
+
+  return (
+    interviewState.answeredTurns >= 1 &&
+    hasRoleContext &&
+    hasDirectionSignal &&
+    hasLevelSignal &&
+    hasEvidenceOrExplicitUncertainty &&
+    hasFitOrNoGoSignal
+  );
+}
+
+function countCoveredCompletionSignals(interviewState: InterviewState) {
+  return [
+    interviewState.coverage.currentWorkReality,
+    interviewState.coverage.levelSeniority,
+    interviewState.coverage.transferableStrengths,
+    interviewState.coverage.directionOfChange,
+    interviewState.coverage.workStyleFit,
+    interviewState.coverage.mismatchRisk,
+    interviewState.coverage.evidenceDepth,
+    interviewState.coverage.concreteEvidence,
+    interviewState.coverage.ownershipScope,
+    interviewState.coverage.resultEvidence,
+    interviewState.coverage.motivationFit,
+    interviewState.coverage.domainContext,
+    interviewState.coverage.noGoClarity,
+    interviewState.coverage.profileStrengthGap,
+  ].filter(Boolean).length;
+}
+
+function hasRecentFocusArea(interviewState: InterviewState, focusArea: FocusArea) {
+  return interviewState.recentQuestions.some((item) => item.focusArea === focusArea);
+}
+
+function countRecentQuestionFamily(interviewState: InterviewState, family: QuestionFamily | null) {
+  if (!family) {
+    return 0;
+  }
+
+  return interviewState.recentQuestions.filter((item) => inferQuestionFamily(item.question, item.focusArea) === family).length;
+}
+
+function countRecentEvidenceTrack(interviewState: InterviewState, track: EvidenceTrack | null) {
+  if (!track) {
+    return 0;
+  }
+
+  return interviewState.recentQuestions.filter((item) => inferEvidenceTrackFromQuestion(item.question) === track).length;
+}
+
+function inferSaturationFamilies(question: string, focusArea: FocusArea): SaturationFamily[] {
+  const normalized = normalizeText(question);
+  const families = new Set<SaturationFamily>();
+  const evidenceTrack = inferEvidenceTrackFromQuestion(question);
+
+  if (
+    focusArea === "current_work_reality" ||
+    ["nuvaerende", "hverdag", "arbejde", "opgaver", "rolle", "drift", "branche", "kunder", "virksomhed"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    families.add("current_work_reality");
+  }
+
+  if (focusArea === "mismatch_risk" || ["undga", "darligt match", "passer ikke", "trives", "no go", "fravalg"].some((keyword) => normalized.includes(keyword))) {
+    families.add("mismatch_risk");
+  }
+
+  if (
+    evidenceTrack === "resultEvidence" ||
+    ["resultat", "effekt", "kom ud af", "forbedr", "bevis", "eksempel", "konkret", "case"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    families.add("resultEvidence");
+  }
+
+  if (
+    evidenceTrack === "ownershipScope" ||
+    ["ansvar", "eget ansvar", "selv ansvaret", "beslut", "stod for", "ejede", "ejer"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    families.add("ownership");
+  }
+
+  if (
+    ["personaleansvar", "ledelse", "leder", "teamleder", "mere ansvar", "mindre ansvar", "ledelsesansvar"].some(
+      (keyword) => normalized.includes(keyword),
+    )
+  ) {
+    families.add("responsibility");
+  }
+
+  return [...families];
+}
+
+function countRecentSaturationFamily(interviewState: InterviewState, family: SaturationFamily) {
+  return interviewState.recentQuestions.filter((item) => inferSaturationFamilies(item.question, item.focusArea).includes(family))
+    .length;
+}
+
+function isQuestionOverused({
+  question,
+  focusArea,
+  interviewState,
+  lastAssistantQuestion,
+}: {
+  question: string;
+  focusArea: FocusArea;
+  interviewState: InterviewState;
+  lastAssistantQuestion: string | null;
+}) {
+  const questionFamily = inferQuestionFamily(question, focusArea);
+  const evidenceTrack = inferEvidenceTrackFromQuestion(question);
+  const isRepeatedQuestion =
+    Boolean(lastAssistantQuestion && areQuestionsTooSimilar(lastAssistantQuestion, question)) ||
+    interviewState.recentQuestions.some((item) => areQuestionsTooSimilar(item.question, question));
+  const recentFocusAreaCount = interviewState.recentQuestions.filter((item) => item.focusArea === focusArea).length;
+  const recentQuestionFamilyCount = countRecentQuestionFamily(interviewState, questionFamily);
+  const recentEvidenceTrackCount = countRecentEvidenceTrack(interviewState, evidenceTrack);
+  const saturatedSemanticFamily = inferSaturationFamilies(question, focusArea).some(
+    (family) => countRecentSaturationFamily(interviewState, family) >= 2,
+  );
+  const isRepeatedLevelQuestion =
+    focusArea === "level_seniority" &&
+    (recentFocusAreaCount >= 2 ||
+      interviewState.coverage.levelSeniority ||
+      interviewState.coverage.ownershipScope ||
+      interviewState.evidenceCounts.ownershipScopeCount >= 1 ||
+      interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1);
+
+  return (
+    isRepeatedQuestion ||
+    recentFocusAreaCount >= 4 ||
+    recentQuestionFamilyCount >= 2 ||
+    recentEvidenceTrackCount >= 2 ||
+    saturatedSemanticFamily ||
+    isRepeatedLevelQuestion ||
+    Boolean(questionFamily && isQuestionFamilySaturated(interviewState, questionFamily)) ||
+    Boolean(evidenceTrack && isEvidenceTrackSaturated(interviewState, evidenceTrack))
+  );
+}
+
+function hasSufficientCompletionSubstance({
+  profileDraft,
+  interviewState,
+  profileModel,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileModel: InterviewProfileModel;
+}) {
+  const kind = inferTargetProfileKind(profileDraft);
+  const strictKind = isStrictCompletionKind(kind);
+  const hasDraftRole = Boolean(profileDraft.currentRole?.trim());
+  const hasDraftTarget = Boolean(profileDraft.targetDirection?.trim());
+  const hasCurrentWorkSignal =
+    interviewState.coverage.currentWorkReality ||
+    interviewState.coverage.domainContext ||
+    hasRecentFocusArea(interviewState, "current_work_reality") ||
+    (!strictKind && hasDraftRole);
+  const hasDirectionSignal =
+    interviewState.coverage.directionOfChange ||
+    interviewState.coverage.profileStrengthGap ||
+    hasRecentFocusArea(interviewState, "direction_change") ||
+    (!strictKind && hasDraftTarget);
+  const hasLevelSignal =
+    interviewState.coverage.levelSeniority ||
+    interviewState.coverage.ownershipScope ||
+    interviewState.evidenceCounts.ownershipScopeCount >= 1 ||
+    interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 ||
+    (!strictKind && Boolean(profileDraft.yearsExperience?.trim()));
+  const hasTransferableOrTransitionSignal =
+    interviewState.coverage.transferableStrengths ||
+    interviewState.coverage.evidenceDepth ||
+    interviewState.coverage.concreteEvidence ||
+    interviewState.coverage.resultEvidence ||
+    profileModel.interpretations.length >= (strictKind ? 2 : 1) ||
+    (!strictKind && Boolean(profileDraft.yearsExperience?.trim()));
+  const hasFitOrBoundarySignal =
+    interviewState.coverage.workStyleFit ||
+    interviewState.coverage.mismatchRisk ||
+    interviewState.coverage.noGoClarity ||
+    interviewState.coverage.motivationFit ||
+    interviewState.coverage.profileStrengthGap;
+  const hasExplicitGapOrUncertainty = profileModel.uncertainties.some((uncertainty) => uncertainty.unresolved);
+  const coveredSignals = countCoveredCompletionSignals(interviewState);
+  const focusBreadth = new Set(interviewState.coveredFocusAreas).size;
+
+  if (!hasCurrentWorkSignal || !hasDirectionSignal || !hasLevelSignal || !hasTransferableOrTransitionSignal) {
+    return false;
+  }
+
+  if (!strictKind) {
+    return coveredSignals >= 4 || (coveredSignals >= 3 && focusBreadth >= 2);
+  }
+
+  if (!hasExplicitGapOrUncertainty || !hasFitOrBoundarySignal) {
+    return false;
+  }
+
+  if (kind === "unclear") {
+    return (
+      (interviewState.coverage.workStyleFit || interviewState.coverage.mismatchRisk || interviewState.coverage.noGoClarity) &&
+      coveredSignals >= 5 &&
+      focusBreadth >= 2
+    );
+  }
+
+  if (kind === "product_transition") {
+    return (
+      interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 &&
+      (interviewState.coverage.ownershipScope || interviewState.coverage.levelSeniority) &&
+      coveredSignals >= 4 &&
+      focusBreadth >= 2
+    );
+  }
+
+  if (kind === "less_responsibility") {
+    return (
+      interviewState.coverage.workStyleFit &&
+      interviewState.coverage.noGoClarity &&
+      (interviewState.coverage.mismatchRisk || interviewState.coverage.profileStrengthGap) &&
+      (interviewState.coverage.ownershipScope || interviewState.coverage.levelSeniority) &&
+      coveredSignals >= 6 &&
+      focusBreadth >= 3
+    );
+  }
+
+  return coveredSignals >= 4 && focusBreadth >= 2;
+}
+
+function shouldCompleteInsteadOfContinuing({
+  question,
+  focusArea,
+  interviewState,
+  profileDraft,
+  profileModel,
+  lastAssistantQuestion,
+}: {
+  question: string;
+  focusArea: FocusArea;
+  interviewState: InterviewState;
+  profileDraft: ProfileDraft;
+  profileModel: InterviewProfileModel;
+  lastAssistantQuestion: string | null;
+}) {
+  if (!hasMinimumProvisionalProfileBasis({ profileDraft, interviewState, profileModel })) {
+    return false;
+  }
+
+  if (!hasSufficientCompletionSubstance({ profileDraft, interviewState, profileModel })) {
+    return false;
+  }
+
+  const visibleProgress = estimateVisibleInterviewProgress(interviewState);
+  const questionFamily = inferQuestionFamily(question, focusArea);
+  const evidenceTrack = inferEvidenceTrackFromQuestion(question);
+  const isRepeatedQuestion =
+    Boolean(lastAssistantQuestion && areQuestionsTooSimilar(lastAssistantQuestion, question)) ||
+    interviewState.recentQuestions.some((item) => areQuestionsTooSimilar(item.question, question));
+  const isSaturatedFamily = Boolean(questionFamily && isQuestionFamilySaturated(interviewState, questionFamily));
+  const isSaturatedEvidenceTrack = Boolean(evidenceTrack && isEvidenceTrackSaturated(interviewState, evidenceTrack));
+  const recentFocusAreaCount = interviewState.recentQuestions.filter((item) => item.focusArea === focusArea).length;
+  const recentQuestionFamilyCount = countRecentQuestionFamily(interviewState, questionFamily);
+  const recentEvidenceTrackCount = countRecentEvidenceTrack(interviewState, evidenceTrack);
+  const saturatedSemanticFamily = inferSaturationFamilies(question, focusArea).some(
+    (family) => countRecentSaturationFamily(interviewState, family) >= 2,
+  );
+  const isRepeatedLevelQuestion =
+    focusArea === "level_seniority" &&
+    (recentFocusAreaCount >= 2 ||
+      interviewState.coverage.levelSeniority ||
+      interviewState.coverage.ownershipScope ||
+      interviewState.evidenceCounts.ownershipScopeCount >= 1 ||
+      interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1);
+  const isRepeatedFocusArea = recentFocusAreaCount >= 4;
+  const isRepeatedSemanticFamily = recentQuestionFamilyCount >= 2 || recentEvidenceTrackCount >= 2;
+  const highProgress = visibleProgress >= 90;
+  const nearCompleteProgress = visibleProgress >= 97;
+
+  return (
+    nearCompleteProgress ||
+    (highProgress &&
+      (isRepeatedQuestion ||
+        isSaturatedFamily ||
+        isSaturatedEvidenceTrack ||
+        isRepeatedLevelQuestion ||
+        isRepeatedFocusArea ||
+        isRepeatedSemanticFamily ||
+        saturatedSemanticFamily)) ||
+    isRepeatedQuestion ||
+    isSaturatedFamily ||
+    isSaturatedEvidenceTrack ||
+    isRepeatedLevelQuestion ||
+    isRepeatedSemanticFamily ||
+    saturatedSemanticFamily
+  );
+}
+
+function buildProvisionalProfileSummary({
+  profileDraft,
+  interviewState,
+  profileModel,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileModel: InterviewProfileModel;
+}): ProfileSummary {
+  const uncertaintyStatements = profileModel.uncertainties
+    .filter((uncertainty) => uncertainty.unresolved)
+    .slice(0, 3)
+    .map((uncertainty) => uncertainty.statement);
+  const strengthStatements = profileModel.interpretations.slice(0, 3).map((interpretation) => interpretation.statement);
+  const currentRole = profileDraft.currentRole?.trim() || null;
+  const targetDirection = profileDraft.targetDirection?.trim() || null;
+  const yearsExperience = profileDraft.yearsExperience?.trim() || null;
+
+  return {
+    userProfileData: {
+      name: profileDraft.name?.trim() || null,
+      currentRole,
+      yearsExperience,
+      targetDirection,
+    },
+    aiProfileCore: {
+      currentWorkReality:
+        currentRole && yearsExperience
+          ? `Brugeren kommer fra ${currentRole} med erfaring beskrevet som: ${yearsExperience}`
+          : currentRole
+            ? `Brugeren kommer fra ${currentRole}, men den fulde arbejdskontekst er stadig delvist usikker.`
+            : "Brugerens nuvaerende arbejdskontekst er kun delvist afklaret.",
+      levelSeniority:
+        interviewState.coverage.ownershipScope || interviewState.coverage.levelSeniority
+          ? "Ansvarsniveauet er tilstraekkeligt belyst til en foreloebig profil, men kan styrkes senere med flere eksempler."
+          : "Ansvarsniveauet er ikke fuldt bevist endnu og boer behandles som en usikkerhed i naeste fase.",
+      transferableStrengths:
+        strengthStatements.length > 0
+          ? strengthStatements
+          : [
+              "Erfaring og retning giver et brugbart foerste billede af overfoerbare styrker.",
+              "Konkrete eksempler kan styrke profilen yderligere senere.",
+              "JobPilot boer bruge profilen som foreloebig og evidence-aware.",
+            ],
+      directionOfChange:
+        targetDirection ??
+        "Brugerens oenskede retning er endnu uklar og boer afklares videre uden at presse en standardretning ned over profilen.",
+      workStyleFit:
+        interviewState.coverage.workStyleFit || interviewState.coverage.noGoClarity || interviewState.coverage.mismatchRisk
+          ? "Der er nok signaler om rammer, motivation eller no-go forhold til at lave en foreloebig matchvurdering."
+          : "Arbejdsstil og no-go forhold er kun delvist afklaret og boer sta som usikkerheder.",
+      mismatchRisks:
+        uncertaintyStatements.length > 0
+          ? uncertaintyStatements
+          : ["Der mangler stadig dybere beviser paa enkelte omraader, men ikke nok til at fortsaette et repeterende interview."],
+      confidence: estimateVisibleInterviewProgress(interviewState) >= 90 ? "medium" : "low",
+    },
+  };
+}
+
+function buildDeterministicCompleteResult({
+  profileDraft,
+  interviewState,
+  profileModel,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileModel: InterviewProfileModel;
+}): Extract<GenerateSuccess, { status: "complete" }> {
+  const profileSummary = buildProvisionalProfileSummary({ profileDraft, interviewState, profileModel });
+  const completedInterviewState = updateInterviewState({
+    interviewState,
+    lastAssistantQuestion: null,
+    lastUserAnswer: null,
+    profileSummary,
+  });
+  const completedProfileModel = buildInterviewProfileModel({
+    profileDraft,
+    interviewState: completedInterviewState,
+    profileSummary,
+    lastUserAnswer: null,
+  });
+
+  return {
+    ok: true,
+    status: "complete",
+    profileSummary,
+    interviewState: completedInterviewState,
+    readinessAssessment: buildReadinessAssessment({
+      profileDraft,
+      profileSummary,
+      interviewState: completedInterviewState,
+      profileModel: completedProfileModel,
+    }),
+    profileModel: completedProfileModel,
+    hypothesisSummary: completedProfileModel.hypotheses.slice(0, 4).map((hypothesis) => ({
+      key: hypothesis.key,
+      statement: hypothesis.statement,
+      confidence: hypothesis.confidence,
+      supportLevel: hypothesis.supportLevel,
+      contradictionLevel: hypothesis.contradictionLevel,
+      unresolved: hypothesis.unresolved,
+    })),
+    uncertaintySummary: completedProfileModel.uncertainties
+      .filter((uncertainty) => uncertainty.unresolved)
+      .slice(0, 4)
+      .map((uncertainty) => ({
+        key: uncertainty.key,
+        statement: uncertainty.statement,
+        impact: uncertainty.impact,
+        focusArea: uncertainty.focusArea,
+      })),
+    communicationSignals: completedProfileModel.communicationSignals,
+  };
 }
 
 function isEvidenceTrackSaturated(interviewState: InterviewState, track: EvidenceTrack) {
@@ -1066,6 +1874,13 @@ type MissingCoverageDimension =
   | "profileStrengthGap";
 
 type EvidenceTrack = "concreteEvidence" | "ownershipScope" | "resultEvidence";
+type QuestionFamily =
+  | "noGoClarity"
+  | "profileStrengthGap"
+  | "productOwnershipEvidence"
+  | "directionChangeRealism"
+  | "domainContext"
+  | EvidenceTrack;
 
 function getMissingCoverageDimensions(interviewState: InterviewState): MissingCoverageDimension[] {
   const coverageEntries: Array<[MissingCoverageDimension, boolean]> = [
@@ -1180,6 +1995,243 @@ function buildRecoveryQuestionForMissingCoverage(
   return null;
 }
 
+function inferQuestionFamily(question: string, focusArea: FocusArea): QuestionFamily | null {
+  const normalized = normalizeText(question);
+
+  if (
+    focusArea === "mismatch_risk" &&
+    [
+      "undga",
+      "fravalg",
+      "darligt match",
+      "trives",
+      "helst undga",
+      "passer ikke",
+      "daarligt fit",
+      "lav indflydelse",
+      "uklare prioriteter",
+      "for meget admin",
+      "kaotisk",
+    ].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    return "noGoClarity";
+  }
+
+  if (
+    focusArea === "mismatch_risk" &&
+    ["svagere", "mangler", "ikke endnu", "bevaege dig mod", "naeste skridt", "ikke bevist"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    return "profileStrengthGap";
+  }
+
+  if (
+    ["backlog", "roadmap", "prioritering", "prioritere", "product owner", "produktbeslut", "formelt ansvar"].some(
+      (keyword) => normalized.includes(keyword),
+    )
+  ) {
+    return "productOwnershipEvidence";
+  }
+
+  if (
+    focusArea === "direction_change" &&
+    ["naeste skridt", "laengere mal", "realistisk", "overgang", "langsigtet"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    return "directionChangeRealism";
+  }
+
+  if (
+    focusArea === "current_work_reality" &&
+    ["branche", "virksomhed", "kunder", "domaene", "saas", "b2b", "miljo"].some((keyword) =>
+      normalized.includes(keyword),
+    )
+  ) {
+    return "domainContext";
+  }
+
+  return inferEvidenceTrackFromQuestion(question);
+}
+
+function isQuestionFamilySaturated(interviewState: InterviewState, family: QuestionFamily) {
+  switch (family) {
+    case "noGoClarity":
+      return interviewState.coverage.noGoClarity && interviewState.evidenceCounts.noGoClarityCount >= 1;
+    case "domainContext":
+      return interviewState.coverage.domainContext && interviewState.coverage.currentWorkReality;
+    case "profileStrengthGap":
+      return interviewState.coverage.profileStrengthGap && interviewState.evidenceCounts.profileStrengthGapCount >= 1;
+    case "productOwnershipEvidence":
+      return interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1;
+    case "directionChangeRealism":
+      return interviewState.coverage.directionOfChange && interviewState.evidenceCounts.profileStrengthGapCount >= 1;
+    case "concreteEvidence":
+      return isEvidenceTrackSaturated(interviewState, "concreteEvidence");
+    case "ownershipScope":
+      return isEvidenceTrackSaturated(interviewState, "ownershipScope");
+    case "resultEvidence":
+      return isEvidenceTrackSaturated(interviewState, "resultEvidence");
+    default:
+      return false;
+  }
+}
+
+function buildNonNoGoRecoveryQuestion(
+  interviewState: InterviewState,
+): { question: string; focusArea: FocusArea; missingDimension: MissingCoverageDimension } | null {
+  return (
+    buildRecoveryQuestionForMissingCoverage(interviewState, [
+      "profileStrengthGap",
+      "resultEvidence",
+      "concreteEvidence",
+      "ownershipScope",
+      "domainContext",
+      "levelSeniority",
+      "directionOfChange",
+      "workStyleFit",
+      "mismatchRisk",
+    ]) ??
+    buildRecoveryQuestionForFocusAreaBreadth(interviewState)
+  );
+}
+
+function buildNonTargetGapRecoveryQuestion(
+  interviewState: InterviewState,
+): { question: string; focusArea: FocusArea; missingDimension: MissingCoverageDimension } | null {
+  return (
+    buildRecoveryQuestionForMissingCoverage(interviewState, [
+      "concreteEvidence",
+      "resultEvidence",
+      "ownershipScope",
+      "directionOfChange",
+      "transferableStrengths",
+      "domainContext",
+      "levelSeniority",
+      "workStyleFit",
+    ]) ??
+    buildRecoveryQuestionForFocusAreaBreadth(interviewState)
+  );
+}
+
+function buildNonOwnershipRecoveryQuestion(
+  interviewState: InterviewState,
+): { question: string; focusArea: FocusArea; missingDimension: MissingCoverageDimension } | null {
+  return (
+    buildRecoveryQuestionForMissingCoverage(interviewState, [
+      "resultEvidence",
+      "concreteEvidence",
+      "domainContext",
+      "transferableStrengths",
+      "directionOfChange",
+      "levelSeniority",
+      "workStyleFit",
+    ]) ??
+    buildRecoveryQuestionForFocusAreaBreadth(interviewState)
+  );
+}
+
+function buildRecoveryQuestionForFocusAreaBreadth(
+  interviewState: InterviewState,
+): { question: string; focusArea: FocusArea; missingDimension: MissingCoverageDimension } | null {
+  const coveredFocusAreas = new Set(interviewState.coveredFocusAreas);
+  const focusAreaPriority: FocusArea[] = [
+    "mismatch_risk",
+    "work_style_fit",
+    "level_seniority",
+    "current_work_reality",
+    "transferable_strengths",
+    "direction_change",
+  ];
+
+  for (const focusArea of focusAreaPriority) {
+    if (coveredFocusAreas.has(focusArea)) {
+      continue;
+    }
+
+    switch (focusArea) {
+      case "mismatch_risk":
+        return {
+          question: "Hvad vil du helst undgå i dit næste job, hvis du skal trives og lykkes?",
+          focusArea,
+          missingDimension: "mismatchRisk",
+        };
+      case "work_style_fit":
+        return {
+          question: "Hvilke rammer eller måder at arbejde på passer bedst til dig i hverdagen?",
+          focusArea,
+          missingDimension: "workStyleFit",
+        };
+      case "level_seniority":
+        return {
+          question: "Hvilket ansvar eller hvilken beslutningsrolle har du typisk haft i de vigtigste opgaver?",
+          focusArea,
+          missingDimension: "levelSeniority",
+        };
+      case "current_work_reality":
+        return {
+          question: "Hvad fylder mest i din hverdag i dag, og hvor ligger dit eget ansvar typisk?",
+          focusArea,
+          missingDimension: "currentWorkReality",
+        };
+      case "transferable_strengths":
+        return {
+          question: "Hvilke styrker bruger du mest i praksis, når du skal lykkes i arbejdet?",
+          focusArea,
+          missingDimension: "transferableStrengths",
+        };
+      case "direction_change":
+        return {
+          question: "Hvad er den vigtigste grund til, at du vil i den retning, du søger nu?",
+          focusArea,
+          missingDimension: "directionOfChange",
+        };
+      default:
+        break;
+    }
+  }
+
+  return null;
+}
+
+function buildLateStageRecoveryQuestion(
+  interviewState: InterviewState,
+): { question: string; focusArea: FocusArea; missingDimension: MissingCoverageDimension } | null {
+  return (
+    buildRecoveryQuestionForMissingCoverage(interviewState, [
+      "noGoClarity",
+      "profileStrengthGap",
+      "resultEvidence",
+      "ownershipScope",
+      "concreteEvidence",
+      "domainContext",
+      "mismatchRisk",
+      "workStyleFit",
+      "levelSeniority",
+    ]) ??
+    (interviewState.coveredFocusAreas.length < 5
+      ? buildRecoveryQuestionForFocusAreaBreadth(interviewState)
+      : null) ??
+    (interviewState.answeredTurns < 7
+      ? buildRecoveryQuestionForMissingCoverage(interviewState, [
+          "noGoClarity",
+          "profileStrengthGap",
+          "resultEvidence",
+          "ownershipScope",
+          "concreteEvidence",
+          "domainContext",
+          "mismatchRisk",
+          "workStyleFit",
+          "levelSeniority",
+        ]) ??
+        buildRecoveryQuestionForFocusAreaBreadth(interviewState)
+      : null)
+  );
+}
+
 function buildGuidedRecoveryQuestionForVagueAnswer(focusArea: FocusArea | null) {
   switch (focusArea) {
     case "current_work_reality":
@@ -1225,11 +2277,13 @@ function isProfileSummarySufficientForPhase1({
   lastAssistantQuestion,
   lastUserAnswer,
   interviewState,
+  profileModel,
 }: {
   profileSummary: ProfileSummary;
   lastAssistantQuestion: string | null;
   lastUserAnswer: string | null;
   interviewState: InterviewState;
+  profileModel?: InterviewProfileModel;
 }) {
   if (!lastAssistantQuestion || !lastUserAnswer) {
     return false;
@@ -1330,11 +2384,27 @@ function isProfileSummarySufficientForPhase1({
     return false;
   }
 
+  if (profileModel && countHighImpactUnresolvedUncertainties(profileModel) >= 3 && interviewState.answeredTurns < 9) {
+    return false;
+  }
+
   return true;
 }
 
 function hasHigherBarTargetDirection(targetDirection: string | null | undefined) {
   const normalized = normalizeText(targetDirection ?? "");
+  const lowerPressureKeywords = [
+    "mindre ansvar",
+    "lavere pres",
+    "bedre balance",
+    "uden topansvar",
+    "ikke laengere opad",
+  ];
+
+  if (lowerPressureKeywords.some((keyword) => normalized.includes(keyword))) {
+    return false;
+  }
+
   const higherBarKeywords = [
     "product manager",
     "produktleder",
@@ -1351,14 +2421,741 @@ function hasHigherBarTargetDirection(targetDirection: string | null | undefined)
   return higherBarKeywords.some((keyword) => normalized.includes(keyword));
 }
 
+function hasFormalProductOwnershipSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "product owner",
+    "produktleder",
+    "roadmap",
+    "backlog",
+    "prioritering",
+    "prioritere",
+    "discovery",
+    "brugerindsigt",
+    "kundebehov",
+    "produktretning",
+  ];
+
+  return keywords.filter((keyword) => normalized.includes(keyword)).length >= 2;
+}
+
+function hasStrategicOwnershipSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "strategi",
+    "strategisk",
+    "retning",
+    "forretning",
+    "roadmap",
+    "prioritering",
+    "beslutning",
+    "maal",
+    "mal",
+  ];
+
+  return keywords.filter((keyword) => normalized.includes(keyword)).length >= 2;
+}
+
+function hasLeadershipScopeSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "leder",
+    "ledelse",
+    "personaleansvar",
+    "team",
+    "coache",
+    "ansvaret for andre",
+    "fordele opgaver",
+    "beslutninger",
+  ];
+
+  return keywords.filter((keyword) => normalized.includes(keyword)).length >= 2;
+}
+
+function hasProductOwnershipEvidenceSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "backlog",
+    "roadmap",
+    "prioritering",
+    "prioritere",
+    "produktbeslut",
+    "product owner",
+    "produktleder",
+    "produktafklaring",
+    "produktretning",
+  ];
+
+  return keywords.filter((keyword) => normalized.includes(keyword)).length >= 2;
+}
+
+function hasProductOwnershipGapSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "ikke formelt",
+    "ikke backlog",
+    "ikke roadmap",
+    "ikke direkte",
+    "stottede prioritering",
+    "beslutningsstotte",
+    "understottede",
+    "ikke product owner",
+    "ikke produktleder",
+  ];
+
+  return keywords.some((keyword) => normalized.includes(keyword));
+}
+
+function hasSelfMinimizingLanguage(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const phrases = ["bare", "lidt", "nok", "hjalp til", "stottede", "forsogte", "ikke sa meget", "mest lidt"];
+  return phrases.some((phrase) => normalized.includes(phrase));
+}
+
+function inferCommunicationSignals(value: string | null | undefined): CommunicationSignals {
+  const normalized = normalizeText(value ?? "");
+  const words = normalized.split(" ").filter(Boolean);
+  const sentenceLikeClauses = (value ?? "").split(/[.!?;,]/).map((item) => item.trim()).filter(Boolean).length;
+  const evidenceHits = [
+    hasConcreteEvidenceSignal(value ?? ""),
+    hasOwnershipScopeSignal(value ?? ""),
+    hasResultEvidenceSignal(value ?? ""),
+    hasDomainContextSignal(value ?? ""),
+  ].filter(Boolean).length;
+
+  const answerStyle: CommunicationSignals["answerStyle"] =
+    words.length >= 80 ? "detailed" : words.length >= 20 ? "balanced" : "concise";
+  const structureLevel: CommunicationSignals["structureLevel"] =
+    sentenceLikeClauses >= 4 ? "high" : sentenceLikeClauses >= 2 ? "medium" : "low";
+  const evidenceDensity: CommunicationSignals["evidenceDensity"] =
+    evidenceHits >= 3 ? "high" : evidenceHits >= 1 ? "medium" : "low";
+
+  return {
+    answerStyle,
+    structureLevel,
+    evidenceDensity,
+    possibleSelfMinimizingLanguage: hasSelfMinimizingLanguage(value),
+    possibleOverlongExplanations: words.length >= 140,
+  };
+}
+
+function buildEvidenceSources({
+  profileDraft,
+  interviewState,
+  profileSummary,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileSummary?: ProfileSummary;
+}): EvidenceSourceState[] {
+  const draftStrength =
+    Object.values(profileDraft).filter((value) => typeof value === "string" && value.trim().length > 0).length >= 3
+      ? "strong"
+      : "light";
+  const answerStrength = interviewState.answeredTurns >= 4 ? "strong" : interviewState.answeredTurns > 0 ? "light" : "none";
+  const summaryStrength = profileSummary ? "strong" : "none";
+
+  return [
+    { key: "profile_draft", label: "Profiludkast", available: true, readiness: "current", strength: draftStrength },
+    {
+      key: "interview_answers",
+      label: "Interviewsvar",
+      available: interviewState.answeredTurns > 0,
+      readiness: "current",
+      strength: answerStrength,
+    },
+    {
+      key: "structured_summary",
+      label: "Struktureret profilsammendrag",
+      available: Boolean(profileSummary),
+      readiness: "current",
+      strength: summaryStrength,
+    },
+    { key: "cv", label: "CV", available: false, readiness: "future_placeholder", strength: "none" },
+    { key: "linkedin", label: "LinkedIn", available: false, readiness: "future_placeholder", strength: "none" },
+    { key: "job_history", label: "Jobhistorik", available: false, readiness: "future_placeholder", strength: "none" },
+    { key: "applications", label: "Ansogninger", available: false, readiness: "future_placeholder", strength: "none" },
+    { key: "certificates", label: "Certifikater", available: false, readiness: "future_placeholder", strength: "none" },
+    { key: "notes", label: "Noter og refleksioner", available: false, readiness: "future_placeholder", strength: "none" },
+    { key: "feedback", label: "Feedback og afslag", available: false, readiness: "future_placeholder", strength: "none" },
+  ];
+}
+
+function addQuestionPriority(
+  priorities: QuestionPriority[],
+  candidate: Omit<QuestionPriority, "score"> & { score: number },
+) {
+  if (priorities.some((item) => item.key === candidate.key)) {
+    return;
+  }
+
+  priorities.push(candidate);
+}
+
+function mapQuestionPriorityToRecoveryQuestion(priority: QuestionPriority) {
+  return {
+    question: priority.question,
+    focusArea: priority.focusArea,
+  };
+}
+
+function buildInterviewProfileModel({
+  profileDraft,
+  interviewState,
+  profileSummary,
+  lastUserAnswer,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileSummary?: ProfileSummary;
+  lastUserAnswer: string | null;
+}): InterviewProfileModel {
+  const coverage = interviewState.coverage;
+  const targetDirection = profileDraft.targetDirection?.trim() ?? null;
+  const currentRole = profileDraft.currentRole?.trim() ?? null;
+  const communicationSignals = inferCommunicationSignals(lastUserAnswer);
+  const evidenceSources = buildEvidenceSources({ profileDraft, interviewState, profileSummary });
+  const facts: ProfileFact[] = [];
+  const interpretations: ProfileInterpretation[] = [];
+  const uncertainties: ProfileUncertainty[] = [];
+  const hypotheses: Hypothesis[] = [];
+  const questionPriorities: QuestionPriority[] = [];
+  const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
+  const targetKind = inferTargetProfileKind(profileDraft);
+  const productOwnershipSupported =
+    hasFormalProductOwnershipSignal(lastUserAnswer) ||
+    hasFormalProductOwnershipSignal(profileSummary?.aiProfileCore.currentWorkReality) ||
+    hasFormalProductOwnershipSignal(profileSummary?.aiProfileCore.levelSeniority);
+  const strategicOwnershipSupported =
+    hasStrategicOwnershipSignal(lastUserAnswer) ||
+    hasStrategicOwnershipSignal(profileSummary?.aiProfileCore.directionOfChange) ||
+    hasStrategicOwnershipSignal(profileSummary?.aiProfileCore.levelSeniority);
+  const leadershipScopeSupported =
+    hasLeadershipScopeSignal(lastUserAnswer) ||
+    hasLeadershipScopeSignal(profileSummary?.aiProfileCore.levelSeniority);
+
+  if (currentRole) {
+    facts.push({
+      key: "current_role",
+      statement: `Nuværende eller seneste rolle er ${currentRole}.`,
+      evidenceLevel: "explicit",
+      sources: ["profile_draft"],
+    });
+  }
+
+  if (targetDirection) {
+    facts.push({
+      key: "target_direction",
+      statement: `Brugeren sigter mod ${targetDirection}.`,
+      evidenceLevel: "explicit",
+      sources: ["profile_draft"],
+    });
+  }
+
+  if (targetDirection && targetKind === "same_track_better_conditions") {
+    interpretations.push({
+      key: "same_track_better_conditions",
+      statement: "Brugerens retning handler primaert om samme type arbejde med bedre rammer, ikke om forfremmelse eller retningsskift.",
+      confidence: coverage.motivationFit || coverage.noGoClarity ? "high" : "medium",
+      evidenceSignals: ["target_direction", "same_track", "conditions_signal"],
+    });
+  }
+
+  if (targetDirection && targetKind === "direction_change") {
+    interpretations.push({
+      key: "direction_change_transfer_basis",
+      statement: "Brugeren oensker et retningsskift, saa profilen skal skelne mellem overfoerbare styrker og manglende direkte beviser.",
+      confidence: coverage.transferableStrengths || coverage.profileStrengthGap ? "medium" : "low",
+      evidenceSignals: ["target_direction", "transferable_strengths", "transition_gap"],
+    });
+  }
+
+  if (targetDirection && targetKind === "unclear") {
+    interpretations.push({
+      key: "direction_unclear_needs_boundaries",
+      statement: "Brugerens retning er bevidst uklar og boer afklares gennem energi, no-go forhold og naermeste realistiske rolletyper.",
+      confidence: coverage.workStyleFit || coverage.noGoClarity ? "medium" : "low",
+      evidenceSignals: ["unclear_direction", "needs_clarification", "no_default_push"],
+    });
+  }
+
+  if (targetDirection && targetKind === "less_responsibility") {
+    interpretations.push({
+      key: "less_responsibility_direction",
+      statement: "Brugeren oensker at bruge sin erfaring med lavere pres og mindre ansvar, ikke en automatisk karrierevej mod hoejere pres.",
+      confidence: coverage.noGoClarity || coverage.workStyleFit ? "high" : "medium",
+      evidenceSignals: ["target_direction", "less_responsibility", "work_style_fit"],
+    });
+  }
+
+  if (targetDirection && targetKind === "specialist_track") {
+    interpretations.push({
+      key: "specialist_without_people_management",
+      statement: "Brugeren sigter mod faglig specialistdybde og har eksplicit fravalgt personaleansvar eller people management.",
+      confidence: coverage.ownershipScope || coverage.resultEvidence ? "high" : "medium",
+      evidenceSignals: ["target_direction", "specialist_track", "no_people_management"],
+    });
+  }
+
+  if (targetDirection && targetKind === "product_transition") {
+    interpretations.push({
+      key: "product_transition_gap",
+      statement: "Brugeren sigter mod produktretning, hvor koordinering og beslutningsstoette skal holdes adskilt fra formelt roadmap- eller backlogansvar.",
+      confidence: interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 ? "high" : "medium",
+      evidenceSignals: ["target_direction", "product_transition", "formal_product_ownership_gap"],
+    });
+  }
+
+  if (coverage.currentWorkReality && profileSummary?.aiProfileCore.currentWorkReality) {
+    facts.push({
+      key: "current_work_reality",
+      statement: profileSummary.aiProfileCore.currentWorkReality,
+      evidenceLevel: "supported",
+      sources: ["interview_answers", "structured_summary"],
+    });
+  }
+
+  if (coverage.domainContext) {
+    facts.push({
+      key: "domain_context",
+      statement: "Branche eller kundekontekst er nu nogenlunde tydeliggjort.",
+      evidenceLevel: "supported",
+      sources: ["interview_answers", ...(profileSummary ? (["structured_summary"] as EvidenceSourceKey[]) : [])],
+    });
+  }
+
+  if (coverage.directionOfChange && profileSummary?.aiProfileCore.directionOfChange) {
+    interpretations.push({
+      key: "direction_is_clearer_than_proof",
+      statement: "Den ønskede retning er tydeligere beskrevet end den endnu er direkte bevist.",
+      confidence: coverage.profileStrengthGap ? "high" : "medium",
+      evidenceSignals: ["direction_of_change", "self_claim_not_proof"],
+    });
+  }
+
+  if (coverage.currentWorkReality && coverage.transferableStrengths && !productOwnershipSupported && higherBarTarget) {
+    interpretations.push({
+      key: "product_adjacent_transition",
+      statement: "Profilen ligner foreløbig en stærkere overgang til produktnære eller hybride roller end til tungt dokumenteret fuldt produktansvar.",
+      confidence: coverage.profileStrengthGap ? "high" : "medium",
+      evidenceSignals: ["cross_functional_coordination", "transferable_strengths", "missing_formal_product_ownership"],
+    });
+  }
+
+  if (coverage.ownershipScope && coverage.currentWorkReality) {
+    interpretations.push({
+      key: "execution_and_coordination_strength",
+      statement: "Styrken ser ud til at ligge i koordinering, gennemførelse, prioriteringsstøtte eller operativ fremdrift.",
+      confidence: coverage.resultEvidence ? "high" : "medium",
+      evidenceSignals: ["ownership_scope", "current_work_reality", "evidence_depth"],
+    });
+  }
+
+  if (!productOwnershipSupported && higherBarTarget) {
+    uncertainties.push({
+      key: "formal_product_ownership",
+      statement: "Formelt produktansvar som roadmap, backlog eller prioriteringsret er endnu ikke stærkt bevist.",
+      impact: "high",
+      focusArea: "level_seniority",
+      unresolved: true,
+    });
+  }
+
+  if (!strategicOwnershipSupported && higherBarTarget) {
+    uncertainties.push({
+      key: "strategic_direction_ownership",
+      statement: "Strategisk retning eller produktbeslutninger er endnu ikke tydeligt underbygget.",
+      impact: "high",
+      focusArea: "level_seniority",
+      unresolved: true,
+    });
+  }
+
+  if (!coverage.resultEvidence) {
+    uncertainties.push({
+      key: "result_strength",
+      statement: "Det er stadig uklart, hvad der konkret kom ud af brugerens arbejde.",
+      impact: "high",
+      focusArea: "transferable_strengths",
+      unresolved: true,
+    });
+  }
+
+  if (!coverage.ownershipScope) {
+    uncertainties.push({
+      key: "ownership_scope",
+      statement: "Det er stadig uklart, hvad brugeren selv bar ansvaret for fra start til slut.",
+      impact: "high",
+      focusArea: "level_seniority",
+      unresolved: true,
+    });
+  }
+
+  if (!coverage.domainContext) {
+    uncertainties.push({
+      key: "domain_context",
+      statement: "Branche, kundetype eller forretningskontekst er endnu ikke stærkt nok forankret.",
+      impact: "medium",
+      focusArea: "current_work_reality",
+      unresolved: true,
+    });
+  }
+
+  if (!coverage.noGoClarity) {
+    uncertainties.push({
+      key: "no_go_clarity",
+      statement: "Det er endnu ikke helt tydeligt, hvilke rammer eller roller der vil være et dårligt match.",
+      impact: "medium",
+      focusArea: "mismatch_risk",
+      unresolved: true,
+    });
+  }
+
+  if (!leadershipScopeSupported && coverage.levelSeniority === false && higherBarTarget) {
+    uncertainties.push({
+      key: "leadership_vs_coordination_scope",
+      statement: "Det er endnu uklart, om niveauet primært er koordinering eller også mere formel ledelses- eller beslutningsscope.",
+      impact: "medium",
+      focusArea: "level_seniority",
+      unresolved: true,
+    });
+  }
+
+  hypotheses.push({
+    key: "target_direction_stronger_than_proven_evidence",
+    statement: "Målretningen er foreløbig stærkere end de direkte beviser.",
+    supportLevel: coverage.profileStrengthGap || (higherBarTarget && !productOwnershipSupported) ? "high" : "medium",
+    contradictionLevel: coverage.resultEvidence && coverage.ownershipScope ? "low" : "none",
+    confidence: coverage.profileStrengthGap ? "high" : "medium",
+    evidenceSignals: ["target_direction", "profile_strength_gap", "evidence_depth"],
+    unresolved: Boolean(coverage.profileStrengthGap || (higherBarTarget && !productOwnershipSupported)),
+  });
+
+  hypotheses.push({
+    key: "product_adjacent_transition_stronger_than_full_pm",
+    statement: "Brugeren er muligvis bedre støttet som produktnær overgangsprofil end som fuldt bevist Product Manager lige nu.",
+    supportLevel: higherBarTarget && !productOwnershipSupported ? "high" : "medium",
+    contradictionLevel: productOwnershipSupported ? "medium" : "none",
+    confidence: higherBarTarget ? "medium" : "low",
+    evidenceSignals: ["target_direction", "missing_formal_product_ownership", "coordination_strength"],
+    unresolved: Boolean(higherBarTarget && !productOwnershipSupported),
+  });
+
+  hypotheses.push({
+    key: "execution_coordination_is_core_strength",
+    statement: "Brugerens stærkeste værdi ser ud til at ligge i koordinering, gennemførelse og beslutningsstøtte.",
+    supportLevel: coverage.currentWorkReality && coverage.transferableStrengths ? "high" : "medium",
+    contradictionLevel: productOwnershipSupported && strategicOwnershipSupported ? "medium" : "low",
+    confidence: coverage.evidenceDepth ? "medium" : "low",
+    evidenceSignals: ["current_work_reality", "transferable_strengths", "ownership_scope"],
+    unresolved: false,
+  });
+
+  hypotheses.push({
+    key: "communication_style_signal",
+    statement:
+      communicationSignals.answerStyle === "detailed"
+        ? "Brugeren forklarer sig forholdsvis udførligt."
+        : communicationSignals.answerStyle === "concise"
+          ? "Brugeren svarer forholdsvis kort og koncentreret."
+          : "Brugeren svarer med nogenlunde balanceret detaljeringsgrad.",
+    supportLevel: "medium",
+    contradictionLevel: "none",
+    confidence: "medium",
+    evidenceSignals: [
+      `answer_style_${communicationSignals.answerStyle}`,
+      `evidence_density_${communicationSignals.evidenceDensity}`,
+      `structure_${communicationSignals.structureLevel}`,
+    ],
+    unresolved: false,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "profile_strength_gap",
+    statement: "Afklar hullet mellem ønsket retning og nuværende beviser.",
+    question: "Hvor mener du selv, at din profil endnu er svagere end den rolle, du gerne vil bevæge dig mod?",
+    focusArea: "mismatch_risk",
+    score:
+      coverage.profileStrengthGap && interviewState.evidenceCounts.profileStrengthGapCount >= 1
+        ? 10
+        : higherBarTarget
+          ? 90
+          : 74,
+    reason: "Det skelner mellem ambition og realistisk næste skridt.",
+    unresolved: !(coverage.profileStrengthGap && interviewState.evidenceCounts.profileStrengthGapCount >= 1) || higherBarTarget,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "result_evidence",
+    statement: "Afklar hvad der konkret kom ud af arbejdet.",
+    question: "Kan du give et konkret eksempel på, hvad der kom ud af dit arbejde i en vigtig opgave eller leverance?",
+    focusArea: "transferable_strengths",
+    score: coverage.resultEvidence ? 18 : 92,
+    reason: "Resultateffekt ændrer både readiness og styrken i profilen.",
+    unresolved: !coverage.resultEvidence,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "ownership_scope",
+    statement: "Afklar hvad brugeren selv bar ansvaret for.",
+    question: "Hvad havde du selv ansvaret for i den opgave fra start til slut?",
+    focusArea: "level_seniority",
+    score:
+      interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 && coverage.ownershipScope
+        ? 12
+        : coverage.ownershipScope
+          ? 16
+          : higherBarTarget
+            ? 91
+            : 87,
+    reason: "Ansvarsscope tester niveau, ikke kun selvopfattelse.",
+    unresolved: !coverage.ownershipScope,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "product_ownership_evidence",
+    statement: "Afklar om der faktisk har vÃ¦ret formelt produkt- eller prioriteringsansvar.",
+    question: "Har du haft direkte ansvar for backlog, roadmap eller egentlig prioritering, eller har du mest understÃ¸ttet andres beslutninger?",
+    focusArea: "level_seniority",
+    score:
+      interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1
+        ? 9
+        : higherBarTarget && !productOwnershipSupported
+          ? 89
+          : 42,
+    reason: "Det skiller produktnÃ¦r erfaring fra formelt produktansvar.",
+    unresolved: higherBarTarget && interviewState.evidenceCounts.productOwnershipEvidenceCount < 1,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "concrete_evidence",
+    statement: "Få et konkret eksempel, hvis profilen stadig er for generisk.",
+    question: "Kan du give et konkret eksempel på en opgave eller situation, som viser det bedst?",
+    focusArea: "transferable_strengths",
+    score: coverage.concreteEvidence ? 20 : 88,
+    reason: "Et konkret eksempel reducerer generisk profilering.",
+    unresolved: !coverage.concreteEvidence,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "no_go_clarity",
+    statement: "Afklar hvad der vil være et dårligt match fremover.",
+    question: "Hvad vil du helst undgå i dit næste job, hvis du skal trives og lykkes?",
+    focusArea: "mismatch_risk",
+    score: coverage.noGoClarity && interviewState.evidenceCounts.noGoClarityCount >= 1 ? 8 : 84,
+    reason: "No-go signaler forbedrer jobmatch og beslutningskvalitet.",
+    unresolved: !(coverage.noGoClarity && interviewState.evidenceCounts.noGoClarityCount >= 1),
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "domain_context",
+    statement: "Afklar branche, kundetype eller forretningskontekst.",
+    question: "Hvilken branche, type virksomhed eller type kunder har du mest arbejdet med de seneste år?",
+    focusArea: "current_work_reality",
+    score: coverage.domainContext ? 22 : 80,
+    reason: "Domænekontekst gør profilen mere realistisk og mindre generisk.",
+    unresolved: !coverage.domainContext,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "level_seniority",
+    statement: "Afklar faktisk beslutnings- og ansvarsniveau.",
+    question: "Hvilket ansvar eller hvilken beslutningsrolle har du typisk haft i de vigtigste opgaver?",
+    focusArea: "level_seniority",
+    score: coverage.levelSeniority ? 24 : higherBarTarget ? 86 : 76,
+    reason: "Niveau og scope påvirker både jobfit og readiness.",
+    unresolved: !coverage.levelSeniority,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "direction_of_change",
+    statement: "Afklar forskellen mellem næste skridt og længere ambition.",
+    question: "Hvad er det vigtigste ved den retning, du søger nu, og er det et næste skridt eller mere et længere mål?",
+    focusArea: "direction_change",
+    score:
+      coverage.directionOfChange && interviewState.evidenceCounts.profileStrengthGapCount >= 1
+        ? 14
+        : coverage.directionOfChange
+          ? 26
+          : 82,
+    reason: "Det skiller reel overgang fra aspiration.",
+    unresolved: !coverage.directionOfChange || interviewState.evidenceCounts.profileStrengthGapCount < 1,
+  });
+
+  addQuestionPriority(questionPriorities, {
+    key: "work_style_fit",
+    statement: "Afklar hvilke rammer der faktisk passer brugeren.",
+    question: "Hvilke rammer eller måder at arbejde på passer bedst til dig i hverdagen, hvis du skal lykkes over tid?",
+    focusArea: "work_style_fit",
+    score: coverage.workStyleFit ? 25 : 72,
+    reason: "Sustainable fit er vigtig, men kommer efter tunge evidenshuller.",
+    unresolved: !coverage.workStyleFit,
+  });
+
+  questionPriorities.sort((a, b) => b.score - a.score);
+
+  return {
+    evidenceSources,
+    facts,
+    interpretations,
+    uncertainties,
+    hypotheses,
+    questionPriorities,
+    communicationSignals,
+  };
+}
+
+function buildRecoveryQuestionFromProfileModel(
+  profileModel: InterviewProfileModel,
+  interviewState: InterviewState,
+  lastAssistantQuestion: string | null = null,
+): { question: string; focusArea: FocusArea } | null {
+  for (const priority of profileModel.questionPriorities) {
+    if (!priority.unresolved || priority.score < 40) {
+      continue;
+    }
+
+    if (
+      isQuestionOverused({
+        question: priority.question,
+        focusArea: priority.focusArea,
+        interviewState,
+        lastAssistantQuestion,
+      })
+    ) {
+      continue;
+    }
+
+    const family = inferQuestionFamily(priority.question, priority.focusArea);
+    if (family && isQuestionFamilySaturated(interviewState, family)) {
+      continue;
+    }
+
+    const evidenceTrack = inferEvidenceTrackFromQuestion(priority.question);
+    if (evidenceTrack && isEvidenceTrackSaturated(interviewState, evidenceTrack)) {
+      continue;
+    }
+
+    return mapQuestionPriorityToRecoveryQuestion(priority);
+  }
+
+  return null;
+}
+
+function buildUnsaturatedRecoveryQuestion({
+  profileModel,
+  interviewState,
+  lastAssistantQuestion,
+  priorityOverride,
+}: {
+  profileModel: InterviewProfileModel;
+  interviewState: InterviewState;
+  lastAssistantQuestion: string | null;
+  priorityOverride?: MissingCoverageDimension[];
+}): { question: string; focusArea: FocusArea; missingDimension?: MissingCoverageDimension } | null {
+  const profileModelRecovery = buildRecoveryQuestionFromProfileModel(profileModel, interviewState, lastAssistantQuestion);
+
+  if (profileModelRecovery) {
+    return profileModelRecovery;
+  }
+
+  const missingDimensions = priorityOverride ?? getMissingCoverageDimensions(interviewState);
+
+  for (const dimension of missingDimensions) {
+    const recovery = buildRecoveryQuestionForMissingCoverage(interviewState, [dimension]);
+
+    if (!recovery) {
+      continue;
+    }
+
+    if (
+      isQuestionOverused({
+        question: recovery.question,
+        focusArea: recovery.focusArea,
+        interviewState,
+        lastAssistantQuestion,
+      })
+    ) {
+      continue;
+    }
+
+    return recovery;
+  }
+
+  const breadthRecovery = buildRecoveryQuestionForFocusAreaBreadth(interviewState);
+
+  if (
+    breadthRecovery &&
+    !isQuestionOverused({
+      question: breadthRecovery.question,
+      focusArea: breadthRecovery.focusArea,
+      interviewState,
+      lastAssistantQuestion,
+    })
+  ) {
+    return breadthRecovery;
+  }
+
+  return null;
+}
+
+function countHighImpactUnresolvedUncertainties(profileModel: InterviewProfileModel) {
+  return profileModel.uncertainties.filter((item) => item.unresolved && item.impact === "high").length;
+}
+
+function buildComplexGapRecoveryQuestion({
+  profileDraft,
+  interviewState,
+  lastAssistantQuestion,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  lastAssistantQuestion: string | null;
+}): { question: string; focusArea: FocusArea } | null {
+  const kind = inferTargetProfileKind(profileDraft);
+
+  if (kind !== "less_responsibility" && kind !== "product_transition") {
+    return null;
+  }
+
+  const recovery =
+    kind === "less_responsibility"
+      ? {
+          question: "Hvad vil du gerne bruge din erfaring til fremover, og hvad skal fylde mindre for at presset bliver lavere?",
+          focusArea: "work_style_fit" as FocusArea,
+        }
+      : kind === "product_transition"
+        ? {
+            question: "Hvilken rolle taet paa maalet virker mest realistisk nu, og hvad skal stadig afklares foer du gaar laengere i den retning?",
+            focusArea: "work_style_fit" as FocusArea,
+          }
+        : null;
+
+  if (
+    !recovery ||
+    isQuestionOverused({
+      question: recovery.question,
+      focusArea: recovery.focusArea,
+      interviewState,
+      lastAssistantQuestion,
+    })
+  ) {
+    return null;
+  }
+
+  return recovery;
+}
+
 function buildReadinessAssessment({
   profileDraft,
   profileSummary,
   interviewState,
+  profileModel,
 }: {
   profileDraft: ProfileDraft;
   profileSummary: ProfileSummary;
   interviewState: InterviewState;
+  profileModel?: InterviewProfileModel;
 }): ReadinessAssessment {
   const coverage = interviewState.coverage;
   const confidence = profileSummary.aiProfileCore.confidence;
@@ -1382,7 +3179,13 @@ function buildReadinessAssessment({
     coverage.resultEvidence;
   const strongContext = coverage.domainContext && coverage.motivationFit && coverage.noGoClarity;
   const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
-  const hasProfileGap = coverage.profileStrengthGap;
+  const hasProfileGap =
+    coverage.profileStrengthGap ||
+    Boolean(
+      profileModel?.hypotheses.some(
+        (hypothesis) => hypothesis.key === "target_direction_stronger_than_proven_evidence" && hypothesis.unresolved,
+      ),
+    );
 
   let targetDirectionSupport: TargetDirectionSupport;
 
@@ -1449,6 +3252,11 @@ function buildReadinessAssessment({
   }
   if (higherBarTarget && !coverage.levelSeniority) {
     gapSignals.push("Du mangler stadig stærkere tegn på niveau og ansvar i forhold til målretningen");
+  }
+  if (
+    profileModel?.uncertainties.some((uncertainty) => uncertainty.key === "formal_product_ownership" && uncertainty.unresolved)
+  ) {
+    gapSignals.push("Formelt ejerskab eller prioriteringsansvar er endnu ikke tydeligt nok bevist");
   }
   if (targetDirectionSupport === "not_yet_proven" && targetDirection) {
     gapSignals.push(`Din profil er endnu mere indirekte end direkte i forhold til ${targetDirection}`);
@@ -1573,20 +3381,81 @@ export async function POST(request: Request) {
 
   if (lowQualityReason) {
     return errorResponse(
-      "Svaret er for kort eller uklart til at føre interviewet videre.",
+      "Det svar er lidt for kort eller uklart til, at JobPilot kan føre interviewet videre endnu. Du må gerne svare kort eller langt. Et konkret eksempel hjælper ofte.",
       "LOW_QUALITY_ANSWER",
       { lowQualityReason },
     );
   }
 
+  const workingInterviewState =
+    answerQuality
+      ? updateInterviewState({
+          interviewState,
+          lastAssistantQuestion: normalizedLastAssistantQuestion,
+          lastUserAnswer: rawLastUserAnswer,
+        })
+      : interviewState;
+  const workingProfileModel = buildInterviewProfileModel({
+    profileDraft,
+    interviewState: workingInterviewState,
+    lastUserAnswer: rawLastUserAnswer,
+  });
+
   if (answerQuality === "vague_but_real_attempt" && normalizedLastAssistantQuestion) {
     const priorFocusArea = inferFocusAreaFromQuestion(normalizedLastAssistantQuestion);
-    const guidedRecovery = buildGuidedRecoveryQuestionForVagueAnswer(priorFocusArea);
-    const updatedInterviewState = updateInterviewState({
-      interviewState,
-      lastAssistantQuestion: normalizedLastAssistantQuestion,
-      lastUserAnswer: rawLastUserAnswer,
-    });
+    let guidedRecovery =
+      buildRecoveryQuestionFromProfileModel(workingProfileModel, workingInterviewState, normalizedLastAssistantQuestion) ??
+      buildGuidedRecoveryQuestionForVagueAnswer(priorFocusArea);
+
+    if (
+      isQuestionOverused({
+        question: guidedRecovery.question,
+        focusArea: guidedRecovery.focusArea,
+        interviewState: workingInterviewState,
+        lastAssistantQuestion: normalizedLastAssistantQuestion,
+      })
+    ) {
+      if (
+        hasMinimumProvisionalProfileBasis({
+          profileDraft,
+          interviewState: workingInterviewState,
+          profileModel: workingProfileModel,
+        }) &&
+        (estimateVisibleInterviewProgress(workingInterviewState) >= 60 || workingInterviewState.answeredTurns >= 2)
+      ) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[interview] completed with uncertainty after overused guided recovery");
+        }
+
+        return Response.json(
+          buildDeterministicCompleteResult({
+            profileDraft,
+            interviewState: workingInterviewState,
+            profileModel: workingProfileModel,
+          }),
+        );
+      }
+
+      const unsaturatedRecovery = buildUnsaturatedRecoveryQuestion({
+        profileModel: workingProfileModel,
+        interviewState: workingInterviewState,
+        lastAssistantQuestion: normalizedLastAssistantQuestion,
+        priorityOverride: [
+          "noGoClarity",
+          "workStyleFit",
+          "directionOfChange",
+          "profileStrengthGap",
+          "domainContext",
+          "ownershipScope",
+          "transferableStrengths",
+          "mismatchRisk",
+        ],
+      });
+
+      if (unsaturatedRecovery) {
+        guidedRecovery = unsaturatedRecovery;
+      }
+    }
 
     if (process.env.NODE_ENV !== "production") {
       console.debug(`[interview] guided recovery for vague answer on ${guidedRecovery.focusArea}`);
@@ -1597,7 +3466,7 @@ export async function POST(request: Request) {
       status: "continue",
       question: guidedRecovery.question,
       focusArea: guidedRecovery.focusArea,
-      interviewState: updatedInterviewState,
+      interviewState: appendRecentQuestion(workingInterviewState, guidedRecovery.question, guidedRecovery.focusArea),
     } satisfies GenerateSuccess);
   }
 
@@ -1618,6 +3487,12 @@ export async function POST(request: Request) {
     "If the latest answer has already clarified the active uncertainty, either move to a different unresolved area or return status complete.",
     "Repeated direction-of-change questions are a sign to stop if the user's direction is already clear enough for phase 1.",
     "You are working toward actual coverage across profiling dimensions, not just a plausible sounding summary.",
+    "Derive as much as possible from current evidence before asking a new question.",
+    "Treat profileDraft and prior structured signals as evidence sources, not just interview decorations.",
+    "Separate facts, interpretations, and uncertainties internally before choosing the next question.",
+    "The user's ambition or self-description is a self-claim, not proof.",
+    "Ask the single next question that most reduces a high-value uncertainty or tests an unresolved hypothesis.",
+    "Prefer fewer heavy questions over many light ones.",
     "Use plain Danish that ordinary users across job types can understand.",
     "Avoid English career jargon and internal HR or product language unless the user's own profile clearly justifies it.",
     "Prefer normal Danish expressions such as specialist uden personaleansvar, faglig specialist, rolle med personaleansvar, or lederrolle when relevant.",
@@ -1638,6 +3513,8 @@ export async function POST(request: Request) {
     "Make it easier to understand what the user owned themselves, what they coordinated, what happened because of their work, and what supports readiness for the next level.",
     "Once a concrete example has already been established with responsibility and result, do not keep asking slightly different versions of the same evidence request.",
     "Avoid semantic circling around the same case, responsibility, or result theme even if the wording changes.",
+    "Do not ask for information that is already strongly known from current structured evidence.",
+    "If current evidence points to a likely interpretation but the proof is still weak, ask the narrowest question that can confirm or challenge it.",
     "When enough evidence has already been gathered on one evidence track, move to missing areas or assess completion instead.",
     "Think in terms of sufficiency for phase-1 profile evaluation: current work reality, level or seniority, transferable strengths, direction of change, work-style fit, and mismatch risk.",
     "Use status complete only when there is enough clarity to begin serious next-step profile assessment.",
@@ -1654,9 +3531,31 @@ export async function POST(request: Request) {
     profileDraft,
     lastAssistantQuestion: normalizedLastAssistantQuestion,
     lastUserAnswer: rawLastUserAnswer,
-    interviewState,
+    interviewState: workingInterviewState,
+    profileModel: {
+      facts: workingProfileModel.facts.slice(0, 4),
+      interpretations: workingProfileModel.interpretations.slice(0, 4),
+      uncertainties: workingProfileModel.uncertainties.slice(0, 5),
+      hypotheses: workingProfileModel.hypotheses.slice(0, 4).map((item) => ({
+        key: item.key,
+        statement: item.statement,
+        supportLevel: item.supportLevel,
+        contradictionLevel: item.contradictionLevel,
+        confidence: item.confidence,
+        unresolved: item.unresolved,
+      })),
+      nextQuestionPriorities: workingProfileModel.questionPriorities.slice(0, 4).map((item) => ({
+        key: item.key,
+        statement: item.statement,
+        focusArea: item.focusArea,
+        score: item.score,
+        reason: item.reason,
+      })),
+      communicationSignals: workingProfileModel.communicationSignals,
+      evidenceSources: workingProfileModel.evidenceSources,
+    },
     instruction:
-      "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. The human-facing question text must be in Danish. If complete, return the structured phase-1 profile summary. Return only the required JSON object.",
+      "Decide whether JobPilot should continue with exactly one next question or stop because phase-1 onboarding is sufficiently complete. Use the profile model to test unresolved hypotheses and evidence gaps before asking anything new. The human-facing question text must be in Danish. If complete, return the structured phase-1 profile summary. Return only the required JSON object.",
   });
 
   async function generateInterviewStep(): Promise<GenerateSuccess | GenerateFailure> {
@@ -1836,11 +3735,24 @@ export async function POST(request: Request) {
           },
         };
 
-        const updatedInterviewState = updateInterviewState({
-          interviewState,
-          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
-          lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+        const updatedInterviewState = answerQuality === "substantive_answer"
+          ? updateInterviewState({
+              interviewState: workingInterviewState,
+              lastAssistantQuestion: null,
+              lastUserAnswer: null,
+              profileSummary: normalizedProfileSummary,
+            })
+          : updateInterviewState({
+              interviewState,
+              lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
+              lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
+              profileSummary: normalizedProfileSummary,
+            });
+        const profileModel = buildInterviewProfileModel({
+          profileDraft,
+          interviewState: updatedInterviewState,
           profileSummary: normalizedProfileSummary,
+          lastUserAnswer: rawLastUserAnswer,
         });
 
         if (
@@ -1849,15 +3761,22 @@ export async function POST(request: Request) {
             lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
             lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
             interviewState: updatedInterviewState,
+            profileModel,
           })
         ) {
-          const recovery = buildRecoveryQuestionForMissingCoverage(updatedInterviewState);
+          const recovery =
+            buildRecoveryQuestionFromProfileModel(
+              profileModel,
+              updatedInterviewState,
+              typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
+            ) ??
+            buildLateStageRecoveryQuestion(updatedInterviewState);
 
           if (recovery) {
             if (process.env.NODE_ENV !== "production") {
-              console.debug(
-                `[interview] recovered from insufficient coverage by asking about ${recovery.missingDimension}`,
-              );
+              const recoveryLabel =
+                "missingDimension" in recovery ? recovery.missingDimension : profileModel.questionPriorities[0]?.key;
+              console.debug(`[interview] recovered from insufficient coverage by asking about ${recoveryLabel}`);
             }
 
             return {
@@ -1865,7 +3784,7 @@ export async function POST(request: Request) {
               status: "continue",
               question: recovery.question,
               focusArea: recovery.focusArea,
-              interviewState: updatedInterviewState,
+              interviewState: appendRecentQuestion(updatedInterviewState, recovery.question, recovery.focusArea),
             };
           }
 
@@ -1886,7 +3805,27 @@ export async function POST(request: Request) {
             profileDraft,
             profileSummary: normalizedProfileSummary,
             interviewState: updatedInterviewState,
+            profileModel,
           }),
+          profileModel,
+          hypothesisSummary: profileModel.hypotheses.slice(0, 4).map((hypothesis) => ({
+            key: hypothesis.key,
+            statement: hypothesis.statement,
+            confidence: hypothesis.confidence,
+            supportLevel: hypothesis.supportLevel,
+            contradictionLevel: hypothesis.contradictionLevel,
+            unresolved: hypothesis.unresolved,
+          })),
+          uncertaintySummary: profileModel.uncertainties
+            .filter((uncertainty) => uncertainty.unresolved)
+            .slice(0, 4)
+            .map((uncertainty) => ({
+              key: uncertainty.key,
+              statement: uncertainty.statement,
+              impact: uncertainty.impact,
+              focusArea: uncertainty.focusArea,
+            })),
+          communicationSignals: profileModel.communicationSignals,
         };
       }
 
@@ -1925,12 +3864,131 @@ export async function POST(request: Request) {
 
       const priorFocusArea =
         typeof lastAssistantQuestion === "string" ? inferFocusAreaFromQuestion(lastAssistantQuestion) : null;
+      const updatedInterviewState = workingInterviewState;
+      const updatedProfileModel = buildInterviewProfileModel({
+        profileDraft,
+        interviewState: updatedInterviewState,
+        lastUserAnswer: rawLastUserAnswer,
+      });
 
       if (
         typeof lastAssistantQuestion === "string" &&
         priorFocusArea === focusArea &&
         areQuestionsTooSimilar(lastAssistantQuestion, question)
       ) {
+        const complexGapRecovery = buildComplexGapRecoveryQuestion({
+          profileDraft,
+          interviewState: updatedInterviewState,
+          lastAssistantQuestion,
+        });
+
+        if (complexGapRecovery) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] redirected repeated question to complex gap recovery");
+          }
+
+          return {
+            ok: true,
+            status: "continue",
+            question: complexGapRecovery.question,
+            focusArea: complexGapRecovery.focusArea,
+            interviewState: appendRecentQuestion(
+              updatedInterviewState,
+              complexGapRecovery.question,
+              complexGapRecovery.focusArea,
+            ),
+          };
+        }
+
+        if (
+          hasMinimumProvisionalProfileBasis({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          }) &&
+          (estimateVisibleInterviewProgress(updatedInterviewState) >= 60 || updatedInterviewState.answeredTurns >= 2)
+        ) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] completed with uncertainty after repeated question hard stop");
+          }
+
+          return buildDeterministicCompleteResult({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          });
+        }
+
+        const recovery = buildUnsaturatedRecoveryQuestion({
+          profileModel: updatedProfileModel,
+          interviewState: updatedInterviewState,
+          lastAssistantQuestion,
+          priorityOverride: [
+            "noGoClarity",
+            "workStyleFit",
+            "directionOfChange",
+            "profileStrengthGap",
+            "domainContext",
+            "ownershipScope",
+            "transferableStrengths",
+            "mismatchRisk",
+          ],
+        });
+
+        if (recovery) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] redirected repeated question before retrying model");
+          }
+
+          return {
+            ok: true,
+            status: "continue",
+            question: recovery.question,
+            focusArea: recovery.focusArea,
+            interviewState: appendRecentQuestion(updatedInterviewState, recovery.question, recovery.focusArea),
+          };
+        }
+
+        if (
+          shouldCompleteInsteadOfContinuing({
+            question,
+            focusArea,
+            interviewState: updatedInterviewState,
+            profileDraft,
+            profileModel: updatedProfileModel,
+            lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+          })
+        ) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] completed instead of returning repeated question");
+          }
+
+          return buildDeterministicCompleteResult({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          });
+        }
+
+        if (
+          hasMinimumProvisionalProfileBasis({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          }) &&
+          (estimateVisibleInterviewProgress(updatedInterviewState) >= 70 || updatedInterviewState.answeredTurns >= 4)
+        ) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] completed with uncertainty after repeated question and no recovery path");
+          }
+
+          return buildDeterministicCompleteResult({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          });
+        }
+
         return {
           ok: false,
           error: "Repeated interview question.",
@@ -1939,25 +3997,150 @@ export async function POST(request: Request) {
         };
       }
 
-      const updatedInterviewState = updateInterviewState({
-        interviewState,
-        lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
-        lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
-      });
+      const questionFamily = inferQuestionFamily(question, focusArea);
+      if (questionFamily && isQuestionFamilySaturated(updatedInterviewState, questionFamily)) {
+        const lastQuestionForRecovery = typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null;
+        const recovery =
+          questionFamily === "noGoClarity"
+            ? buildUnsaturatedRecoveryQuestion({
+                profileModel: updatedProfileModel,
+                interviewState: updatedInterviewState,
+                lastAssistantQuestion: lastQuestionForRecovery,
+                priorityOverride: [
+                  "profileStrengthGap",
+                  "resultEvidence",
+                  "concreteEvidence",
+                  "ownershipScope",
+                  "domainContext",
+                  "levelSeniority",
+                  "directionOfChange",
+                  "workStyleFit",
+                  "mismatchRisk",
+                ],
+              })
+            : questionFamily === "productOwnershipEvidence"
+              ? buildUnsaturatedRecoveryQuestion({
+                  profileModel: updatedProfileModel,
+                  interviewState: updatedInterviewState,
+                  lastAssistantQuestion: lastQuestionForRecovery,
+                  priorityOverride: [
+                    "profileStrengthGap",
+                    "resultEvidence",
+                    "concreteEvidence",
+                    "domainContext",
+                    "transferableStrengths",
+                    "directionOfChange",
+                    "workStyleFit",
+                  ],
+                })
+            : questionFamily === "profileStrengthGap"
+              ? buildUnsaturatedRecoveryQuestion({
+                  profileModel: updatedProfileModel,
+                  interviewState: updatedInterviewState,
+                  lastAssistantQuestion: lastQuestionForRecovery,
+                  priorityOverride: [
+                    "concreteEvidence",
+                    "resultEvidence",
+                    "ownershipScope",
+                    "directionOfChange",
+                    "transferableStrengths",
+                    "domainContext",
+                    "levelSeniority",
+                    "workStyleFit",
+                  ],
+                })
+            : buildUnsaturatedRecoveryQuestion({
+                profileModel: updatedProfileModel,
+                interviewState: updatedInterviewState,
+                lastAssistantQuestion: lastQuestionForRecovery,
+              });
+
+        if (recovery) {
+          if (
+            shouldCompleteInsteadOfContinuing({
+              question: recovery.question,
+              focusArea: recovery.focusArea,
+              interviewState: updatedInterviewState,
+              profileDraft,
+              profileModel: updatedProfileModel,
+              lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+            })
+          ) {
+            if (process.env.NODE_ENV !== "production") {
+              console.debug("[interview] completed instead of returning saturated-family recovery question");
+            }
+
+            return buildDeterministicCompleteResult({
+              profileDraft,
+              interviewState: updatedInterviewState,
+              profileModel: updatedProfileModel,
+            });
+          }
+
+          if (process.env.NODE_ENV !== "production") {
+            const recoveryLabel =
+              "missingDimension" in recovery ? recovery.missingDimension : updatedProfileModel.questionPriorities[0]?.key;
+            if (questionFamily === "noGoClarity") {
+              console.debug(`[interview] blocked noGo family repetition -> ${recoveryLabel}`);
+            } else if (questionFamily === "productOwnershipEvidence") {
+              console.debug(`[interview] blocked ownership/product-decision repetition -> ${recoveryLabel}`);
+            } else if (questionFamily === "profileStrengthGap") {
+              console.debug(`[interview] blocked targetGap family repetition -> ${recoveryLabel}`);
+            } else {
+              console.debug(`[interview] blocked saturated ${questionFamily} family and redirected to ${recoveryLabel}`);
+            }
+          }
+
+          return {
+            ok: true,
+            status: "continue",
+            question: recovery.question,
+            focusArea: recovery.focusArea,
+            interviewState: appendRecentQuestion(updatedInterviewState, recovery.question, recovery.focusArea),
+          };
+        }
+      }
 
       const evidenceTrack = inferEvidenceTrackFromQuestion(question);
 
       if (evidenceTrack && isEvidenceTrackSaturated(updatedInterviewState, evidenceTrack)) {
-        const recovery = buildRecoveryQuestionForMissingCoverage(updatedInterviewState, [
-          "noGoClarity",
-          "profileStrengthGap",
-          "mismatchRisk",
-          "workStyleFit",
-          "levelSeniority",
-          "domainContext",
-        ]);
+        const recovery = buildUnsaturatedRecoveryQuestion({
+          profileModel: updatedProfileModel,
+          interviewState: updatedInterviewState,
+          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+          priorityOverride: [
+            "noGoClarity",
+            "profileStrengthGap",
+            "mismatchRisk",
+            "workStyleFit",
+            "directionOfChange",
+            "domainContext",
+            "ownershipScope",
+          ],
+        });
 
         if (recovery) {
+          if (
+            shouldCompleteInsteadOfContinuing({
+              question: recovery.question,
+              focusArea: recovery.focusArea,
+              interviewState: updatedInterviewState,
+              profileDraft,
+              profileModel: updatedProfileModel,
+              lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+            })
+          ) {
+            if (process.env.NODE_ENV !== "production") {
+              console.debug("[interview] completed instead of returning saturated-evidence recovery question");
+            }
+
+            return buildDeterministicCompleteResult({
+              profileDraft,
+              interviewState: updatedInterviewState,
+              profileModel: updatedProfileModel,
+            });
+          }
+
           if (process.env.NODE_ENV !== "production") {
             console.debug(`[interview] recovered from saturated evidence track: ${evidenceTrack}`);
           }
@@ -1967,9 +4150,141 @@ export async function POST(request: Request) {
             status: "continue",
             question: recovery.question,
             focusArea: recovery.focusArea,
-            interviewState: updatedInterviewState,
+            interviewState: appendRecentQuestion(updatedInterviewState, recovery.question, recovery.focusArea),
           };
         }
+      }
+
+      if (
+        isQuestionOverused({
+          question,
+          focusArea,
+          interviewState: updatedInterviewState,
+          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+        }) &&
+        !hasSufficientCompletionSubstance({
+          profileDraft,
+          interviewState: updatedInterviewState,
+          profileModel: updatedProfileModel,
+        })
+      ) {
+        const recovery = buildUnsaturatedRecoveryQuestion({
+          profileModel: updatedProfileModel,
+          interviewState: updatedInterviewState,
+          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+          priorityOverride: [
+            "noGoClarity",
+            "workStyleFit",
+            "directionOfChange",
+            "profileStrengthGap",
+            "domainContext",
+            "ownershipScope",
+            "transferableStrengths",
+            "mismatchRisk",
+          ],
+        });
+
+        if (recovery) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] redirected overused question before completion was sufficient");
+          }
+
+          return {
+            ok: true,
+            status: "continue",
+            question: recovery.question,
+            focusArea: recovery.focusArea,
+            interviewState: appendRecentQuestion(updatedInterviewState, recovery.question, recovery.focusArea),
+          };
+        }
+
+        if (
+          hasMinimumProvisionalProfileBasis({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          }) &&
+          (estimateVisibleInterviewProgress(updatedInterviewState) >= 70 || updatedInterviewState.answeredTurns >= 4)
+        ) {
+          const complexGapRecovery = buildComplexGapRecoveryQuestion({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+          });
+
+          if (complexGapRecovery) {
+            if (process.env.NODE_ENV !== "production") {
+              console.debug("[interview] redirected no-recovery completion to complex gap recovery");
+            }
+
+            return {
+              ok: true,
+              status: "continue",
+              question: complexGapRecovery.question,
+              focusArea: complexGapRecovery.focusArea,
+              interviewState: appendRecentQuestion(
+                updatedInterviewState,
+                complexGapRecovery.question,
+                complexGapRecovery.focusArea,
+              ),
+            };
+          }
+
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] completed with uncertainty because no unsaturated question remained");
+          }
+
+          return buildDeterministicCompleteResult({
+            profileDraft,
+            interviewState: updatedInterviewState,
+            profileModel: updatedProfileModel,
+          });
+        }
+      }
+
+      if (
+        shouldCompleteInsteadOfContinuing({
+          question,
+          focusArea,
+          interviewState: updatedInterviewState,
+          profileDraft,
+          profileModel: updatedProfileModel,
+          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+        })
+      ) {
+        const complexGapRecovery = buildComplexGapRecoveryQuestion({
+          profileDraft,
+          interviewState: updatedInterviewState,
+          lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion : null,
+        });
+
+        if (complexGapRecovery) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[interview] redirected forced completion to complex gap recovery");
+          }
+
+          return {
+            ok: true,
+            status: "continue",
+            question: complexGapRecovery.question,
+            focusArea: complexGapRecovery.focusArea,
+            interviewState: appendRecentQuestion(
+              updatedInterviewState,
+              complexGapRecovery.question,
+              complexGapRecovery.focusArea,
+            ),
+          };
+        }
+
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[interview] completed instead of continuing after deterministic post-processing gate");
+        }
+
+        return buildDeterministicCompleteResult({
+          profileDraft,
+          interviewState: updatedInterviewState,
+          profileModel: updatedProfileModel,
+        });
       }
 
       return {
@@ -1977,7 +4292,7 @@ export async function POST(request: Request) {
         status,
         question,
         focusArea,
-        interviewState: updatedInterviewState,
+        interviewState: appendRecentQuestion(updatedInterviewState, question, focusArea),
       };
     } catch {
       return {
