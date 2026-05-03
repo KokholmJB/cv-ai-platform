@@ -782,9 +782,18 @@ function inferTargetProfileKind(profileDraft: ProfileDraft): TargetProfileKind {
 
   if (
     ["specialist", "faglig", "ekspert"].some((keyword) => target.includes(keyword) || currentRole.includes(keyword)) &&
-    ["ikke blive people manager", "ikke people manager", "ikke personaleansvar", "uden personaleansvar"].some((keyword) =>
-      target.includes(keyword),
-    )
+    [
+      "ikke blive people manager",
+      "ikke people manager",
+      "ikke personaleansvar",
+      "uden personaleansvar",
+      "ikke have personaleledelse",
+      "ikke personaleledelse",
+      "ikke ledelse",
+      "ikke leder",
+      "ikke blive leder",
+      "ikke vaere leder",
+    ].some((keyword) => target.includes(keyword))
   ) {
     return "specialist_track";
   }
@@ -1602,6 +1611,45 @@ function hasSufficientCompletionSubstance({
     return false;
   }
 
+  if (kind === "same_track_better_conditions") {
+    const hasConditionsInterviewSignal =
+      interviewState.coverage.workStyleFit ||
+      interviewState.coverage.mismatchRisk ||
+      hasRecentFocusArea(interviewState, "work_style_fit") ||
+      hasRecentFocusArea(interviewState, "mismatch_risk");
+
+    return (
+      hasConditionsInterviewSignal &&
+      (coveredSignals >= 4 || (coveredSignals >= 3 && focusBreadth >= 2))
+    );
+  }
+
+  if (kind === "specialist_track") {
+    const hasSpecialistDepthSignal =
+      interviewState.coverage.transferableStrengths ||
+      interviewState.coverage.ownershipScope ||
+      interviewState.coverage.evidenceDepth ||
+      interviewState.coverage.levelSeniority ||
+      hasRecentFocusArea(interviewState, "transferable_strengths") ||
+      hasRecentFocusArea(interviewState, "level_seniority");
+    const hasExpertContributionSignal =
+      interviewState.coverage.evidenceDepth ||
+      interviewState.coverage.concreteEvidence ||
+      interviewState.coverage.ownershipScope ||
+      interviewState.coverage.resultEvidence;
+    const hasSpecialistFitSignal =
+      interviewState.coverage.workStyleFit &&
+      (interviewState.coverage.noGoClarity || interviewState.coverage.mismatchRisk || interviewState.coverage.motivationFit);
+
+    return (
+      hasSpecialistDepthSignal &&
+      hasExpertContributionSignal &&
+      hasSpecialistFitSignal &&
+      coveredSignals >= 5 &&
+      focusBreadth >= 3
+    );
+  }
+
   if (!strictKind) {
     return coveredSignals >= 4 || (coveredSignals >= 3 && focusBreadth >= 2);
   }
@@ -1621,7 +1669,12 @@ function hasSufficientCompletionSubstance({
   if (kind === "product_transition") {
     return (
       interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 &&
+      interviewState.coverage.directionOfChange &&
       (interviewState.coverage.ownershipScope || interviewState.coverage.levelSeniority) &&
+      (interviewState.coverage.profileStrengthGap ||
+        interviewState.coverage.workStyleFit ||
+        interviewState.coverage.mismatchRisk ||
+        interviewState.coverage.noGoClarity) &&
       coveredSignals >= 4 &&
       focusBreadth >= 2
     );
@@ -2620,8 +2673,15 @@ function buildInterviewProfileModel({
   const uncertainties: ProfileUncertainty[] = [];
   const hypotheses: Hypothesis[] = [];
   const questionPriorities: QuestionPriority[] = [];
-  const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
   const targetKind = inferTargetProfileKind(profileDraft);
+  const isProductTransitionTarget = targetKind === "product_transition";
+  const isStableSameTrackTarget = targetKind === "same_track" || targetKind === "same_track_better_conditions";
+  const higherBarTarget =
+    hasHigherBarTargetDirection(targetDirection) &&
+    !isStableSameTrackTarget &&
+    targetKind !== "unclear" &&
+    targetKind !== "less_responsibility" &&
+    targetKind !== "specialist_track";
   const productOwnershipSupported =
     hasFormalProductOwnershipSignal(lastUserAnswer) ||
     hasFormalProductOwnershipSignal(profileSummary?.aiProfileCore.currentWorkReality) ||
@@ -2690,10 +2750,11 @@ function buildInterviewProfileModel({
 
   if (targetDirection && targetKind === "specialist_track") {
     interpretations.push({
-      key: "specialist_without_people_management",
-      statement: "Brugeren sigter mod faglig specialistdybde og har eksplicit fravalgt personaleansvar eller people management.",
-      confidence: coverage.ownershipScope || coverage.resultEvidence ? "high" : "medium",
-      evidenceSignals: ["target_direction", "specialist_track", "no_people_management"],
+      key: "specialist_track_preference",
+      statement:
+        "Brugeren vil fordybe sig som faglig specialist og bevare hands-on ekspertise frem for at bevæge sig mod personaleledelse.",
+      confidence: coverage.ownershipScope || coverage.resultEvidence || coverage.workStyleFit ? "high" : "medium",
+      evidenceSignals: ["target_direction", "specialist_track", "hands_on_expertise", "technical_depth"],
     });
   }
 
@@ -2733,7 +2794,7 @@ function buildInterviewProfileModel({
     });
   }
 
-  if (coverage.currentWorkReality && coverage.transferableStrengths && !productOwnershipSupported && higherBarTarget) {
+  if (coverage.currentWorkReality && coverage.transferableStrengths && !productOwnershipSupported && isProductTransitionTarget) {
     interpretations.push({
       key: "product_adjacent_transition",
       statement: "Profilen ligner foreløbig en stærkere overgang til produktnære eller hybride roller end til tungt dokumenteret fuldt produktansvar.",
@@ -2751,7 +2812,7 @@ function buildInterviewProfileModel({
     });
   }
 
-  if (!productOwnershipSupported && higherBarTarget) {
+  if (!productOwnershipSupported && isProductTransitionTarget) {
     uncertainties.push({
       key: "formal_product_ownership",
       statement: "Formelt produktansvar som roadmap, backlog eller prioriteringsret er endnu ikke stærkt bevist.",
@@ -2761,7 +2822,7 @@ function buildInterviewProfileModel({
     });
   }
 
-  if (!strategicOwnershipSupported && higherBarTarget) {
+  if (!strategicOwnershipSupported && isProductTransitionTarget) {
     uncertainties.push({
       key: "strategic_direction_ownership",
       statement: "Strategisk retning eller produktbeslutninger er endnu ikke tydeligt underbygget.",
@@ -2824,22 +2885,24 @@ function buildInterviewProfileModel({
   hypotheses.push({
     key: "target_direction_stronger_than_proven_evidence",
     statement: "Målretningen er foreløbig stærkere end de direkte beviser.",
-    supportLevel: coverage.profileStrengthGap || (higherBarTarget && !productOwnershipSupported) ? "high" : "medium",
+    supportLevel: coverage.profileStrengthGap || (higherBarTarget && !coverage.resultEvidence) ? "high" : "medium",
     contradictionLevel: coverage.resultEvidence && coverage.ownershipScope ? "low" : "none",
     confidence: coverage.profileStrengthGap ? "high" : "medium",
     evidenceSignals: ["target_direction", "profile_strength_gap", "evidence_depth"],
-    unresolved: Boolean(coverage.profileStrengthGap || (higherBarTarget && !productOwnershipSupported)),
+    unresolved: Boolean(coverage.profileStrengthGap || (higherBarTarget && !coverage.resultEvidence)),
   });
 
-  hypotheses.push({
-    key: "product_adjacent_transition_stronger_than_full_pm",
+  if (isProductTransitionTarget) {
+    hypotheses.push({
+      key: "product_adjacent_transition_stronger_than_full_pm",
     statement: "Brugeren er muligvis bedre støttet som produktnær overgangsprofil end som fuldt bevist Product Manager lige nu.",
-    supportLevel: higherBarTarget && !productOwnershipSupported ? "high" : "medium",
+      supportLevel: !productOwnershipSupported ? "high" : "medium",
     contradictionLevel: productOwnershipSupported ? "medium" : "none",
-    confidence: higherBarTarget ? "medium" : "low",
+      confidence: "medium",
     evidenceSignals: ["target_direction", "missing_formal_product_ownership", "coordination_strength"],
-    unresolved: Boolean(higherBarTarget && !productOwnershipSupported),
-  });
+      unresolved: !productOwnershipSupported,
+    });
+  }
 
   hypotheses.push({
     key: "execution_coordination_is_core_strength",
@@ -2885,6 +2948,18 @@ function buildInterviewProfileModel({
     unresolved: !(coverage.profileStrengthGap && interviewState.evidenceCounts.profileStrengthGapCount >= 1) || higherBarTarget,
   });
 
+  if (targetKind === "specialist_track") {
+    addQuestionPriority(questionPriorities, {
+      key: "specialist_track_preference",
+      statement: "Afklar specialistdybde, hands-on ekspertise og fravalg af personaleledelse.",
+      question: "Hvilken type fagligt ansvar passer bedst til dig, hvis du skal blive dybere specialist og stadig vaere taet paa opgaverne?",
+      focusArea: "work_style_fit",
+      score: coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit) ? 16 : 94,
+      reason: "Specialistretningen skal beskrives som faglig dybde og hands-on ansvar, ikke som et ledelsesspor.",
+      unresolved: !(coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit)),
+    });
+  }
+
   addQuestionPriority(questionPriorities, {
     key: "result_evidence",
     statement: "Afklar hvad der konkret kom ud af arbejdet.",
@@ -2912,8 +2987,9 @@ function buildInterviewProfileModel({
     unresolved: !coverage.ownershipScope,
   });
 
-  addQuestionPriority(questionPriorities, {
-    key: "product_ownership_evidence",
+  if (isProductTransitionTarget) {
+    addQuestionPriority(questionPriorities, {
+      key: "product_ownership_evidence",
     statement: "Afklar om der faktisk har vÃ¦ret formelt produkt- eller prioriteringsansvar.",
     question: "Har du haft direkte ansvar for backlog, roadmap eller egentlig prioritering, eller har du mest understÃ¸ttet andres beslutninger?",
     focusArea: "level_seniority",
@@ -2925,7 +3001,8 @@ function buildInterviewProfileModel({
           : 42,
     reason: "Det skiller produktnÃ¦r erfaring fra formelt produktansvar.",
     unresolved: higherBarTarget && interviewState.evidenceCounts.productOwnershipEvidenceCount < 1,
-  });
+    });
+  }
 
   addQuestionPriority(questionPriorities, {
     key: "concrete_evidence",
@@ -3114,7 +3191,7 @@ function buildComplexGapRecoveryQuestion({
 }): { question: string; focusArea: FocusArea } | null {
   const kind = inferTargetProfileKind(profileDraft);
 
-  if (kind !== "less_responsibility" && kind !== "product_transition") {
+  if (kind !== "less_responsibility" && kind !== "product_transition" && kind !== "specialist_track") {
     return null;
   }
 
@@ -3129,7 +3206,10 @@ function buildComplexGapRecoveryQuestion({
             question: "Hvilken rolle taet paa maalet virker mest realistisk nu, og hvad skal stadig afklares foer du gaar laengere i den retning?",
             focusArea: "work_style_fit" as FocusArea,
           }
-        : null;
+        : {
+            question: "Hvilken type fagligt ansvar passer bedst til dig, hvis du skal blive dybere specialist og stadig vaere taet paa opgaverne?",
+            focusArea: "work_style_fit" as FocusArea,
+          };
 
   if (
     !recovery ||
@@ -3178,19 +3258,27 @@ function buildReadinessAssessment({
     coverage.ownershipScope &&
     coverage.resultEvidence;
   const strongContext = coverage.domainContext && coverage.motivationFit && coverage.noGoClarity;
-  const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
+  const targetKind = inferTargetProfileKind(profileDraft);
+  const isStableSameTrackTarget = targetKind === "same_track" || targetKind === "same_track_better_conditions";
+  const higherBarTarget =
+    hasHigherBarTargetDirection(targetDirection) &&
+    !isStableSameTrackTarget &&
+    targetKind !== "unclear" &&
+    targetKind !== "less_responsibility" &&
+    targetKind !== "specialist_track";
   const hasProfileGap =
-    coverage.profileStrengthGap ||
-    Boolean(
-      profileModel?.hypotheses.some(
-        (hypothesis) => hypothesis.key === "target_direction_stronger_than_proven_evidence" && hypothesis.unresolved,
-      ),
-    );
+    !isStableSameTrackTarget &&
+    (coverage.profileStrengthGap ||
+      Boolean(
+        profileModel?.hypotheses.some(
+          (hypothesis) => hypothesis.key === "target_direction_stronger_than_proven_evidence" && hypothesis.unresolved,
+        ),
+      ));
 
   let targetDirectionSupport: TargetDirectionSupport;
 
   if (
-    hasProfileGap ||
+    (!isStableSameTrackTarget && hasProfileGap) ||
     (higherBarTarget && (!strongEvidence || !coverage.levelSeniority || practicalEvidenceCount < 2))
   ) {
     targetDirectionSupport = "not_yet_proven";
