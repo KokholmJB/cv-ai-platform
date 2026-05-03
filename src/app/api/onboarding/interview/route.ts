@@ -782,9 +782,20 @@ function inferTargetProfileKind(profileDraft: ProfileDraft): TargetProfileKind {
 
   if (
     ["specialist", "faglig", "ekspert"].some((keyword) => target.includes(keyword) || currentRole.includes(keyword)) &&
-    ["ikke blive people manager", "ikke people manager", "ikke personaleansvar", "uden personaleansvar"].some((keyword) =>
-      target.includes(keyword),
-    )
+    [
+      "ikke blive people manager",
+      "ikke people manager",
+      "ikke personaleansvar",
+      "uden personaleansvar",
+      "ikke formelt personaleansvar",
+      "ikke have formelt personaleansvar",
+      "ikke have personaleledelse",
+      "ikke personaleledelse",
+      "ikke ledelse",
+      "ikke leder",
+      "ikke blive leder",
+      "ikke vaere leder",
+    ].some((keyword) => target.includes(keyword))
   ) {
     return "specialist_track";
   }
@@ -1602,6 +1613,74 @@ function hasSufficientCompletionSubstance({
     return false;
   }
 
+  if (kind === "same_track_better_conditions") {
+    const hasConditionsInterviewSignal =
+      interviewState.coverage.workStyleFit ||
+      interviewState.coverage.mismatchRisk ||
+      hasRecentFocusArea(interviewState, "work_style_fit") ||
+      hasRecentFocusArea(interviewState, "mismatch_risk");
+
+    return (
+      hasConditionsInterviewSignal &&
+      (coveredSignals >= 4 || (coveredSignals >= 3 && focusBreadth >= 2))
+    );
+  }
+
+  if (kind === "specialist_track") {
+    const technicalLeadershipTarget = isSpecialistTechnicalLeadershipTarget(profileDraft);
+    const hasSpecialistDepthSignal =
+      interviewState.coverage.transferableStrengths ||
+      interviewState.coverage.ownershipScope ||
+      interviewState.coverage.evidenceDepth ||
+      interviewState.coverage.levelSeniority ||
+      hasRecentFocusArea(interviewState, "transferable_strengths") ||
+      hasRecentFocusArea(interviewState, "level_seniority");
+    const hasExpertContributionSignal =
+      interviewState.coverage.evidenceDepth ||
+      interviewState.coverage.concreteEvidence ||
+      interviewState.coverage.ownershipScope ||
+      interviewState.coverage.resultEvidence;
+    const hasSpecialistFitSignal =
+      interviewState.coverage.workStyleFit &&
+      (interviewState.coverage.noGoClarity || interviewState.coverage.mismatchRisk || interviewState.coverage.motivationFit);
+
+    const hasTechnicalLeadershipResponsibilitySignal =
+      interviewState.coverage.levelSeniority ||
+      interviewState.coverage.ownershipScope ||
+      hasRecentFocusArea(interviewState, "level_seniority");
+    const hasTechnicalLeadershipImpactSignal =
+      interviewState.coverage.resultEvidence ||
+      interviewState.coverage.concreteEvidence ||
+      interviewState.coverage.evidenceDepth;
+    const hasTechnicalLeadershipBoundarySignal =
+      (interviewState.coverage.workStyleFit || hasRecentFocusArea(interviewState, "work_style_fit")) &&
+      (interviewState.coverage.noGoClarity ||
+        interviewState.coverage.mismatchRisk ||
+        interviewState.coverage.motivationFit ||
+        hasRecentFocusArea(interviewState, "mismatch_risk"));
+
+    if (technicalLeadershipTarget) {
+      return (
+        hasSpecialistDepthSignal &&
+        hasExpertContributionSignal &&
+        hasSpecialistFitSignal &&
+        hasTechnicalLeadershipResponsibilitySignal &&
+        hasTechnicalLeadershipImpactSignal &&
+        hasTechnicalLeadershipBoundarySignal &&
+        coveredSignals >= 6 &&
+        focusBreadth >= 3
+      );
+    }
+
+    return (
+      hasSpecialistDepthSignal &&
+      hasExpertContributionSignal &&
+      hasSpecialistFitSignal &&
+      coveredSignals >= 5 &&
+      focusBreadth >= 3
+    );
+  }
+
   if (!strictKind) {
     return coveredSignals >= 4 || (coveredSignals >= 3 && focusBreadth >= 2);
   }
@@ -1621,20 +1700,34 @@ function hasSufficientCompletionSubstance({
   if (kind === "product_transition") {
     return (
       interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 &&
+      interviewState.coverage.directionOfChange &&
       (interviewState.coverage.ownershipScope || interviewState.coverage.levelSeniority) &&
-      coveredSignals >= 4 &&
-      focusBreadth >= 2
+      (interviewState.coverage.profileStrengthGap || interviewState.evidenceCounts.profileStrengthGapCount >= 1) &&
+      (interviewState.coverage.profileStrengthGap ||
+        interviewState.coverage.workStyleFit ||
+        interviewState.coverage.mismatchRisk ||
+        interviewState.coverage.noGoClarity) &&
+      (interviewState.coverage.workStyleFit ||
+        interviewState.coverage.mismatchRisk ||
+        interviewState.coverage.noGoClarity) &&
+      coveredSignals >= 5 &&
+      focusBreadth >= 3
     );
   }
 
   if (kind === "less_responsibility") {
+    const hasPressureBoundarySignal =
+      interviewState.coverage.workStyleFit ||
+      interviewState.coverage.noGoClarity ||
+      interviewState.coverage.mismatchRisk;
     return (
-      interviewState.coverage.workStyleFit &&
-      interviewState.coverage.noGoClarity &&
-      (interviewState.coverage.mismatchRisk || interviewState.coverage.profileStrengthGap) &&
+      hasPressureBoundarySignal &&
+      (interviewState.coverage.noGoClarity ||
+        interviewState.coverage.mismatchRisk ||
+        interviewState.coverage.profileStrengthGap) &&
       (interviewState.coverage.ownershipScope || interviewState.coverage.levelSeniority) &&
-      coveredSignals >= 6 &&
-      focusBreadth >= 3
+      coveredSignals >= 5 &&
+      focusBreadth >= 2
     );
   }
 
@@ -2472,6 +2565,90 @@ function hasLeadershipScopeSignal(value: string | null | undefined) {
   return keywords.filter((keyword) => normalized.includes(keyword)).length >= 2;
 }
 
+function hasTechnicalLeadershipSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "faglig ledelse",
+    "technical lead",
+    "lead specialist",
+    "fagligt ansvar",
+    "standarder",
+    "review",
+    "mentoring",
+    "sparring",
+    "kvalitet",
+    "metodevalg",
+    "faglig retning",
+    "beslutningspavirkning",
+    "beslutningsstotte",
+  ];
+
+  return keywords.some((keyword) => normalized.includes(keyword));
+}
+
+function hasExplicitTechnicalLeadershipIntentSignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const keywords = [
+    "faglig ledelse",
+    "teknisk ledelse",
+    "technical lead",
+    "lead specialist",
+    "fagligt ansvar",
+    "faglig retning",
+    "teknisk retning",
+    "standardansvar",
+    "mentoring",
+    "mentor",
+  ];
+
+  return keywords.some((keyword) => normalized.includes(keyword));
+}
+
+function hasNoFormalPeopleManagementBoundarySignal(value: string | null | undefined) {
+  const normalized = normalizeText(value ?? "");
+  const boundaryPhrases = [
+    "uden personaleansvar",
+    "ikke personaleansvar",
+    "ikke formelt personaleansvar",
+    "ikke have personaleansvar",
+    "ikke personaleledelse",
+    "uden personaleledelse",
+    "ikke people manager",
+    "ikke blive people manager",
+    "ikke mus",
+    "ingen hr opgaver",
+    "ikke hr opgaver",
+    "ikke ansattelser",
+    "ikke ansaettelser",
+    "ikke hiring",
+    "ikke firing",
+  ];
+
+  return boundaryPhrases.some((phrase) => normalized.includes(phrase));
+}
+
+function shouldNeutralizeLeadershipPromptForSpecialist(profileDraft: ProfileDraft) {
+  const targetDirection = profileDraft.targetDirection ?? "";
+  return (
+    inferTargetProfileKind(profileDraft) === "specialist_track" &&
+    hasNoFormalPeopleManagementBoundarySignal(targetDirection) &&
+    !hasExplicitTechnicalLeadershipIntentSignal(targetDirection)
+  );
+}
+
+function neutralizeLeadershipPromptForSpecialist(question: string) {
+  if (!/vil du.{0,80}(leder|ledelse|teamleder|personaleansvar|people manager)/iu.test(question)) {
+    return question;
+  }
+
+  return "Hvilken type faglige opgaver vil du helst have mere af, uden at rollen bliver en personalelederrolle?";
+}
+
+function isSpecialistTechnicalLeadershipTarget(profileDraft: ProfileDraft) {
+  const combined = `${profileDraft.targetDirection ?? ""} ${profileDraft.currentRole ?? ""}`.trim();
+  return hasTechnicalLeadershipSignal(combined) && hasNoFormalPeopleManagementBoundarySignal(combined);
+}
+
 function hasProductOwnershipEvidenceSignal(value: string | null | undefined) {
   const normalized = normalizeText(value ?? "");
   const keywords = [
@@ -2620,8 +2797,15 @@ function buildInterviewProfileModel({
   const uncertainties: ProfileUncertainty[] = [];
   const hypotheses: Hypothesis[] = [];
   const questionPriorities: QuestionPriority[] = [];
-  const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
   const targetKind = inferTargetProfileKind(profileDraft);
+  const isProductTransitionTarget = targetKind === "product_transition";
+  const isStableSameTrackTarget = targetKind === "same_track" || targetKind === "same_track_better_conditions";
+  const higherBarTarget =
+    hasHigherBarTargetDirection(targetDirection) &&
+    !isStableSameTrackTarget &&
+    targetKind !== "unclear" &&
+    targetKind !== "less_responsibility" &&
+    targetKind !== "specialist_track";
   const productOwnershipSupported =
     hasFormalProductOwnershipSignal(lastUserAnswer) ||
     hasFormalProductOwnershipSignal(profileSummary?.aiProfileCore.currentWorkReality) ||
@@ -2633,6 +2817,26 @@ function buildInterviewProfileModel({
   const leadershipScopeSupported =
     hasLeadershipScopeSignal(lastUserAnswer) ||
     hasLeadershipScopeSignal(profileSummary?.aiProfileCore.levelSeniority);
+  const technicalLeadershipIntentSignal =
+    hasExplicitTechnicalLeadershipIntentSignal(targetDirection) ||
+    hasExplicitTechnicalLeadershipIntentSignal(lastUserAnswer) ||
+    hasExplicitTechnicalLeadershipIntentSignal(profileSummary?.aiProfileCore.currentWorkReality) ||
+    hasExplicitTechnicalLeadershipIntentSignal(profileSummary?.aiProfileCore.levelSeniority) ||
+    hasExplicitTechnicalLeadershipIntentSignal(profileSummary?.aiProfileCore.workStyleFit) ||
+    profileSummary?.aiProfileCore.transferableStrengths.some((item) => hasExplicitTechnicalLeadershipIntentSignal(item)) === true;
+  const noFormalPeopleManagementBoundarySignal =
+    hasNoFormalPeopleManagementBoundarySignal(targetDirection) ||
+    hasNoFormalPeopleManagementBoundarySignal(lastUserAnswer) ||
+    hasNoFormalPeopleManagementBoundarySignal(profileSummary?.aiProfileCore.levelSeniority) ||
+    hasNoFormalPeopleManagementBoundarySignal(profileSummary?.aiProfileCore.workStyleFit);
+  const normalizedTargetDirection = normalizeText(targetDirection ?? "");
+  const specialistTechnicalLeadershipFromTargetText =
+    targetKind === "specialist_track" &&
+    hasExplicitTechnicalLeadershipIntentSignal(normalizedTargetDirection) &&
+    /((ikke|uden).{0,25}(personaleansvar|personaleledelse|people manager|mus|hr))/i.test(normalizedTargetDirection);
+  const specialistTechnicalLeadershipWithoutPeopleManagement =
+    specialistTechnicalLeadershipFromTargetText ||
+    (targetKind === "specialist_track" && technicalLeadershipIntentSignal && noFormalPeopleManagementBoundarySignal);
 
   if (currentRole) {
     facts.push({
@@ -2690,10 +2894,21 @@ function buildInterviewProfileModel({
 
   if (targetDirection && targetKind === "specialist_track") {
     interpretations.push({
-      key: "specialist_without_people_management",
-      statement: "Brugeren sigter mod faglig specialistdybde og har eksplicit fravalgt personaleansvar eller people management.",
-      confidence: coverage.ownershipScope || coverage.resultEvidence ? "high" : "medium",
-      evidenceSignals: ["target_direction", "specialist_track", "no_people_management"],
+      key: "specialist_track_preference",
+      statement:
+        "Brugeren vil fordybe sig som faglig specialist og bevare hands-on ekspertise frem for at bevæge sig mod personaleledelse.",
+      confidence: coverage.ownershipScope || coverage.resultEvidence || coverage.workStyleFit ? "high" : "medium",
+      evidenceSignals: ["target_direction", "specialist_track", "hands_on_expertise", "technical_depth"],
+    });
+  }
+
+  if (specialistTechnicalLeadershipWithoutPeopleManagement) {
+    interpretations.push({
+      key: "specialist_technical_leadership",
+      statement:
+        "Brugeren oensker faglig eller teknisk ledelse med standarder, mentoring eller faglig retning, men uden formelt personaleansvar.",
+      confidence: coverage.ownershipScope || coverage.levelSeniority ? "high" : "medium",
+      evidenceSignals: ["technical_leadership_intent", "specialist_track", "no_formal_people_management"],
     });
   }
 
@@ -2733,7 +2948,7 @@ function buildInterviewProfileModel({
     });
   }
 
-  if (coverage.currentWorkReality && coverage.transferableStrengths && !productOwnershipSupported && higherBarTarget) {
+  if (coverage.currentWorkReality && coverage.transferableStrengths && !productOwnershipSupported && isProductTransitionTarget) {
     interpretations.push({
       key: "product_adjacent_transition",
       statement: "Profilen ligner foreløbig en stærkere overgang til produktnære eller hybride roller end til tungt dokumenteret fuldt produktansvar.",
@@ -2751,7 +2966,7 @@ function buildInterviewProfileModel({
     });
   }
 
-  if (!productOwnershipSupported && higherBarTarget) {
+  if (!productOwnershipSupported && isProductTransitionTarget) {
     uncertainties.push({
       key: "formal_product_ownership",
       statement: "Formelt produktansvar som roadmap, backlog eller prioriteringsret er endnu ikke stærkt bevist.",
@@ -2761,7 +2976,7 @@ function buildInterviewProfileModel({
     });
   }
 
-  if (!strategicOwnershipSupported && higherBarTarget) {
+  if (!strategicOwnershipSupported && isProductTransitionTarget) {
     uncertainties.push({
       key: "strategic_direction_ownership",
       statement: "Strategisk retning eller produktbeslutninger er endnu ikke tydeligt underbygget.",
@@ -2811,6 +3026,20 @@ function buildInterviewProfileModel({
     });
   }
 
+  if (
+    specialistTechnicalLeadershipWithoutPeopleManagement &&
+    !(coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit))
+  ) {
+    uncertainties.push({
+      key: "technical_leadership_vs_people_management_boundary",
+      statement:
+        "Graensen mellem oensket faglig ledelse og fravalgt formel personaleledelse er endnu ikke tydelig nok.",
+      impact: "medium",
+      focusArea: "work_style_fit",
+      unresolved: true,
+    });
+  }
+
   if (!leadershipScopeSupported && coverage.levelSeniority === false && higherBarTarget) {
     uncertainties.push({
       key: "leadership_vs_coordination_scope",
@@ -2824,22 +3053,24 @@ function buildInterviewProfileModel({
   hypotheses.push({
     key: "target_direction_stronger_than_proven_evidence",
     statement: "Målretningen er foreløbig stærkere end de direkte beviser.",
-    supportLevel: coverage.profileStrengthGap || (higherBarTarget && !productOwnershipSupported) ? "high" : "medium",
+    supportLevel: coverage.profileStrengthGap || (higherBarTarget && !coverage.resultEvidence) ? "high" : "medium",
     contradictionLevel: coverage.resultEvidence && coverage.ownershipScope ? "low" : "none",
     confidence: coverage.profileStrengthGap ? "high" : "medium",
     evidenceSignals: ["target_direction", "profile_strength_gap", "evidence_depth"],
-    unresolved: Boolean(coverage.profileStrengthGap || (higherBarTarget && !productOwnershipSupported)),
+    unresolved: Boolean(coverage.profileStrengthGap || (higherBarTarget && !coverage.resultEvidence)),
   });
 
-  hypotheses.push({
-    key: "product_adjacent_transition_stronger_than_full_pm",
+  if (isProductTransitionTarget) {
+    hypotheses.push({
+      key: "product_adjacent_transition_stronger_than_full_pm",
     statement: "Brugeren er muligvis bedre støttet som produktnær overgangsprofil end som fuldt bevist Product Manager lige nu.",
-    supportLevel: higherBarTarget && !productOwnershipSupported ? "high" : "medium",
+      supportLevel: !productOwnershipSupported ? "high" : "medium",
     contradictionLevel: productOwnershipSupported ? "medium" : "none",
-    confidence: higherBarTarget ? "medium" : "low",
+      confidence: "medium",
     evidenceSignals: ["target_direction", "missing_formal_product_ownership", "coordination_strength"],
-    unresolved: Boolean(higherBarTarget && !productOwnershipSupported),
-  });
+      unresolved: !productOwnershipSupported,
+    });
+  }
 
   hypotheses.push({
     key: "execution_coordination_is_core_strength",
@@ -2885,6 +3116,32 @@ function buildInterviewProfileModel({
     unresolved: !(coverage.profileStrengthGap && interviewState.evidenceCounts.profileStrengthGapCount >= 1) || higherBarTarget,
   });
 
+  if (targetKind === "specialist_track") {
+    addQuestionPriority(questionPriorities, {
+      key: "specialist_track_preference",
+      statement: "Afklar specialistdybde, hands-on ekspertise og fravalg af personaleledelse.",
+      question: "Hvilken type fagligt ansvar passer bedst til dig, hvis du skal blive dybere specialist og stadig vaere taet paa opgaverne?",
+      focusArea: "work_style_fit",
+      score: coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit) ? 16 : 94,
+      reason: "Specialistretningen skal beskrives som faglig dybde og hands-on ansvar, ikke som et ledelsesspor.",
+      unresolved: !(coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit)),
+    });
+  }
+
+  if (specialistTechnicalLeadershipWithoutPeopleManagement) {
+    addQuestionPriority(questionPriorities, {
+      key: "specialist_technical_leadership_boundary",
+      statement: "Afklar forskellen mellem oensket faglig ledelse og fravalgt personaleledelse.",
+      question:
+        "Hvilket fagligt ansvar passer bedst til dig, og hvilke opgaver skal tydeligt ligge uden for din rolle?",
+      focusArea: "work_style_fit",
+      score:
+        coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit) ? 20 : 96,
+      reason: "Det holder technical lead-sporet adskilt fra formel people management.",
+      unresolved: !(coverage.workStyleFit && (coverage.noGoClarity || coverage.mismatchRisk || coverage.motivationFit)),
+    });
+  }
+
   addQuestionPriority(questionPriorities, {
     key: "result_evidence",
     statement: "Afklar hvad der konkret kom ud af arbejdet.",
@@ -2912,8 +3169,9 @@ function buildInterviewProfileModel({
     unresolved: !coverage.ownershipScope,
   });
 
-  addQuestionPriority(questionPriorities, {
-    key: "product_ownership_evidence",
+  if (isProductTransitionTarget) {
+    addQuestionPriority(questionPriorities, {
+      key: "product_ownership_evidence",
     statement: "Afklar om der faktisk har vÃ¦ret formelt produkt- eller prioriteringsansvar.",
     question: "Har du haft direkte ansvar for backlog, roadmap eller egentlig prioritering, eller har du mest understÃ¸ttet andres beslutninger?",
     focusArea: "level_seniority",
@@ -2925,7 +3183,8 @@ function buildInterviewProfileModel({
           : 42,
     reason: "Det skiller produktnÃ¦r erfaring fra formelt produktansvar.",
     unresolved: higherBarTarget && interviewState.evidenceCounts.productOwnershipEvidenceCount < 1,
-  });
+    });
+  }
 
   addQuestionPriority(questionPriorities, {
     key: "concrete_evidence",
@@ -3053,15 +3312,34 @@ function buildUnsaturatedRecoveryQuestion({
   lastAssistantQuestion: string | null;
   priorityOverride?: MissingCoverageDimension[];
 }): { question: string; focusArea: FocusArea; missingDimension?: MissingCoverageDimension } | null {
+  const isStableSameTrackBetterConditions =
+    profileModel.interpretations.some((item) => item.key === "same_track_better_conditions");
+  const ownershipSignalAlreadyCaptured =
+    interviewState.coverage.ownershipScope ||
+    interviewState.coverage.levelSeniority ||
+    interviewState.evidenceCounts.ownershipScopeCount >= 1;
+  const shouldSkipOwnershipLevelRecovery =
+    isStableSameTrackBetterConditions && ownershipSignalAlreadyCaptured;
+
   const profileModelRecovery = buildRecoveryQuestionFromProfileModel(profileModel, interviewState, lastAssistantQuestion);
 
-  if (profileModelRecovery) {
+  if (
+    profileModelRecovery &&
+    !(shouldSkipOwnershipLevelRecovery && profileModelRecovery.focusArea === "level_seniority")
+  ) {
     return profileModelRecovery;
   }
 
   const missingDimensions = priorityOverride ?? getMissingCoverageDimensions(interviewState);
 
   for (const dimension of missingDimensions) {
+    if (
+      shouldSkipOwnershipLevelRecovery &&
+      (dimension === "ownershipScope" || dimension === "levelSeniority")
+    ) {
+      continue;
+    }
+
     const recovery = buildRecoveryQuestionForMissingCoverage(interviewState, [dimension]);
 
     if (!recovery) {
@@ -3114,7 +3392,7 @@ function buildComplexGapRecoveryQuestion({
 }): { question: string; focusArea: FocusArea } | null {
   const kind = inferTargetProfileKind(profileDraft);
 
-  if (kind !== "less_responsibility" && kind !== "product_transition") {
+  if (kind !== "less_responsibility" && kind !== "product_transition" && kind !== "specialist_track") {
     return null;
   }
 
@@ -3129,7 +3407,10 @@ function buildComplexGapRecoveryQuestion({
             question: "Hvilken rolle taet paa maalet virker mest realistisk nu, og hvad skal stadig afklares foer du gaar laengere i den retning?",
             focusArea: "work_style_fit" as FocusArea,
           }
-        : null;
+        : {
+            question: "Hvilken type fagligt ansvar passer bedst til dig, hvis du skal blive dybere specialist og stadig vaere taet paa opgaverne?",
+            focusArea: "work_style_fit" as FocusArea,
+          };
 
   if (
     !recovery ||
@@ -3178,19 +3459,27 @@ function buildReadinessAssessment({
     coverage.ownershipScope &&
     coverage.resultEvidence;
   const strongContext = coverage.domainContext && coverage.motivationFit && coverage.noGoClarity;
-  const higherBarTarget = hasHigherBarTargetDirection(targetDirection);
+  const targetKind = inferTargetProfileKind(profileDraft);
+  const isStableSameTrackTarget = targetKind === "same_track" || targetKind === "same_track_better_conditions";
+  const higherBarTarget =
+    hasHigherBarTargetDirection(targetDirection) &&
+    !isStableSameTrackTarget &&
+    targetKind !== "unclear" &&
+    targetKind !== "less_responsibility" &&
+    targetKind !== "specialist_track";
   const hasProfileGap =
-    coverage.profileStrengthGap ||
-    Boolean(
-      profileModel?.hypotheses.some(
-        (hypothesis) => hypothesis.key === "target_direction_stronger_than_proven_evidence" && hypothesis.unresolved,
-      ),
-    );
+    !isStableSameTrackTarget &&
+    (coverage.profileStrengthGap ||
+      Boolean(
+        profileModel?.hypotheses.some(
+          (hypothesis) => hypothesis.key === "target_direction_stronger_than_proven_evidence" && hypothesis.unresolved,
+        ),
+      ));
 
   let targetDirectionSupport: TargetDirectionSupport;
 
   if (
-    hasProfileGap ||
+    (!isStableSameTrackTarget && hasProfileGap) ||
     (higherBarTarget && (!strongEvidence || !coverage.levelSeniority || practicalEvidenceCount < 2))
   ) {
     targetDirectionSupport = "not_yet_proven";
@@ -3829,7 +4118,7 @@ export async function POST(request: Request) {
         };
       }
 
-      const question = typeof result.question === "string" ? result.question.trim() : "";
+      let question = typeof result.question === "string" ? result.question.trim() : "";
       const focusArea = normalizeFocusArea(result.focusArea);
 
       if (!question || question.length > 300 || /\n/.test(question)) {
@@ -3870,6 +4159,10 @@ export async function POST(request: Request) {
         interviewState: updatedInterviewState,
         lastUserAnswer: rawLastUserAnswer,
       });
+
+      if (shouldNeutralizeLeadershipPromptForSpecialist(profileDraft)) {
+        question = neutralizeLeadershipPromptForSpecialist(question);
+      }
 
       if (
         typeof lastAssistantQuestion === "string" &&
