@@ -242,6 +242,14 @@ type TargetProfileKind =
   | "unclear"
   | "less_responsibility"
   | "specialist_track";
+type TransitionDistance = "near" | "adjacent" | "far";
+type MandateJump = "none" | "moderate" | "high";
+type EvidenceFit = "supported" | "partial" | "weak";
+type TransitionProfile = {
+  transitionDistance: TransitionDistance;
+  mandateJump: MandateJump;
+  evidenceFit: EvidenceFit;
+};
 type SaturationFamily = "current_work_reality" | "resultEvidence" | "responsibility" | "mismatch_risk" | "ownership";
 
 function isShortString(value: unknown, maxLength = 300): value is string {
@@ -817,6 +825,62 @@ function inferTargetProfileKind(profileDraft: ProfileDraft): TargetProfileKind {
   }
 
   return "same_track";
+}
+
+function inferTransitionProfile({
+  profileDraft,
+  interviewState,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+}): TransitionProfile {
+  const targetKind = inferTargetProfileKind(profileDraft);
+  const currentRole = normalizeText(profileDraft.currentRole ?? "");
+  const targetDirection = normalizeText(profileDraft.targetDirection ?? "");
+  const roleTokens = new Set(getMeaningfulTokens(currentRole));
+  const targetTokens = new Set(getMeaningfulTokens(targetDirection));
+  const overlap = [...targetTokens].filter((token) => roleTokens.has(token)).length;
+
+  let transitionDistance: TransitionDistance = "near";
+  if (targetKind === "direction_change") {
+    transitionDistance = overlap >= 2 ? "adjacent" : "far";
+  } else if (targetKind === "product_transition") {
+    transitionDistance = "adjacent";
+  }
+
+  const highMandateSignals = ["leder", "ledelse", "personaleansvar", "head", "director", "ansvar for team", "strategisk ansvar"];
+  const moderateMandateSignals = ["ansvar", "eje", "ejerskab", "prioritering", "beslutning", "koordinering"];
+  const hasHighMandateSignal = highMandateSignals.some((keyword) => targetDirection.includes(keyword));
+  const hasModerateMandateSignal = moderateMandateSignals.some((keyword) => targetDirection.includes(keyword));
+  const mandateJump: MandateJump = hasHighMandateSignal
+    ? "high"
+    : hasModerateMandateSignal
+      ? "moderate"
+      : "none";
+
+  const evidenceScore =
+    (interviewState.coverage.transferableStrengths ? 1 : 0) +
+    (interviewState.coverage.ownershipScope ? 1 : 0) +
+    (interviewState.coverage.resultEvidence ? 1 : 0) +
+    (interviewState.coverage.domainContext ? 1 : 0) +
+    (interviewState.coverage.directionOfChange ? 1 : 0) +
+    (interviewState.coverage.workStyleFit ? 1 : 0) +
+    (interviewState.coverage.mismatchRisk || interviewState.coverage.noGoClarity ? 1 : 0);
+  const hasProfileGap =
+    interviewState.coverage.profileStrengthGap || interviewState.evidenceCounts.profileStrengthGapCount >= 1;
+
+  let evidenceFit: EvidenceFit = "weak";
+  if (evidenceScore >= 5 && !hasProfileGap) {
+    evidenceFit = "supported";
+  } else if (evidenceScore >= 3) {
+    evidenceFit = "partial";
+  }
+
+  return {
+    transitionDistance,
+    mandateJump,
+    evidenceFit,
+  };
 }
 
 function isStrictCompletionKind(kind: TargetProfileKind) {
@@ -1643,6 +1707,7 @@ function hasSufficientCompletionSubstance({
     const hasSpecialistFitSignal =
       interviewState.coverage.workStyleFit &&
       (interviewState.coverage.noGoClarity || interviewState.coverage.mismatchRisk || interviewState.coverage.motivationFit);
+    const hasSpecialistBoundarySignal = interviewState.coverage.noGoClarity || interviewState.coverage.mismatchRisk;
 
     const hasTechnicalLeadershipResponsibilitySignal =
       interviewState.coverage.levelSeniority ||
@@ -1676,6 +1741,7 @@ function hasSufficientCompletionSubstance({
       hasSpecialistDepthSignal &&
       hasExpertContributionSignal &&
       hasSpecialistFitSignal &&
+      hasSpecialistBoundarySignal &&
       coveredSignals >= 5 &&
       focusBreadth >= 3
     );
@@ -1697,6 +1763,26 @@ function hasSufficientCompletionSubstance({
     );
   }
 
+  if (kind === "direction_change") {
+    const transitionProfile = inferTransitionProfile({ profileDraft, interviewState });
+    const isFarWeakTransition =
+      transitionProfile.transitionDistance === "far" &&
+      (transitionProfile.evidenceFit === "weak" || transitionProfile.evidenceFit === "partial");
+
+    if (isFarWeakTransition) {
+      return (
+        interviewState.coverage.transferableStrengths &&
+        interviewState.coverage.directionOfChange &&
+        (interviewState.coverage.profileStrengthGap || interviewState.evidenceCounts.profileStrengthGapCount >= 1) &&
+        (interviewState.coverage.workStyleFit || interviewState.coverage.mismatchRisk || interviewState.coverage.noGoClarity) &&
+        coveredSignals >= 5 &&
+        focusBreadth >= 3
+      );
+    }
+
+    return coveredSignals >= 4 && focusBreadth >= 2;
+  }
+
   if (kind === "product_transition") {
     return (
       interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1 &&
@@ -1710,6 +1796,7 @@ function hasSufficientCompletionSubstance({
       (interviewState.coverage.workStyleFit ||
         interviewState.coverage.mismatchRisk ||
         interviewState.coverage.noGoClarity) &&
+      (interviewState.coverage.domainContext || interviewState.coverage.noGoClarity) &&
       coveredSignals >= 5 &&
       focusBreadth >= 3
     );
@@ -2798,6 +2885,7 @@ function buildInterviewProfileModel({
   const hypotheses: Hypothesis[] = [];
   const questionPriorities: QuestionPriority[] = [];
   const targetKind = inferTargetProfileKind(profileDraft);
+  const transitionProfile = inferTransitionProfile({ profileDraft, interviewState });
   const isProductTransitionTarget = targetKind === "product_transition";
   const isStableSameTrackTarget = targetKind === "same_track" || targetKind === "same_track_better_conditions";
   const higherBarTarget =
@@ -2899,6 +2987,17 @@ function buildInterviewProfileModel({
         "Brugeren vil fordybe sig som faglig specialist og bevare hands-on ekspertise frem for at bevæge sig mod personaleledelse.",
       confidence: coverage.ownershipScope || coverage.resultEvidence || coverage.workStyleFit ? "high" : "medium",
       evidenceSignals: ["target_direction", "specialist_track", "hands_on_expertise", "technical_depth"],
+    });
+  }
+
+  if (targetKind === "direction_change" && transitionProfile.transitionDistance === "far") {
+    uncertainties.push({
+      key: "bridge_step_for_transition_distance",
+      statement:
+        "Skiftet kan vaere stort nok til, at en bro- eller overgangsrolle kan vaere mere realistisk end et direkte hop.",
+      impact: "medium",
+      focusArea: "direction_change",
+      unresolved: transitionProfile.evidenceFit !== "supported",
     });
   }
 
@@ -3059,6 +3158,19 @@ function buildInterviewProfileModel({
     evidenceSignals: ["target_direction", "profile_strength_gap", "evidence_depth"],
     unresolved: Boolean(coverage.profileStrengthGap || (higherBarTarget && !coverage.resultEvidence)),
   });
+
+  if (targetKind === "direction_change" && transitionProfile.transitionDistance === "far") {
+    hypotheses.push({
+      key: "adjacent_bridge_role_may_be_best_next_step",
+      statement:
+        "En naermere overgangsrolle kan vaere den hurtigste vej mod maalet, mens direkte domaenebeviser stadig bygges op.",
+      supportLevel: transitionProfile.evidenceFit === "supported" ? "medium" : "high",
+      contradictionLevel: transitionProfile.evidenceFit === "supported" ? "medium" : "low",
+      confidence: transitionProfile.evidenceFit === "supported" ? "medium" : "high",
+      evidenceSignals: ["direction_of_change", "transferable_strengths", "profile_strength_gap", "domain_context"],
+      unresolved: transitionProfile.evidenceFit !== "supported",
+    });
+  }
 
   if (isProductTransitionTarget) {
     hypotheses.push({
@@ -3548,7 +3660,7 @@ function buildReadinessAssessment({
     gapSignals.push("Formelt ejerskab eller prioriteringsansvar er endnu ikke tydeligt nok bevist");
   }
   if (targetDirectionSupport === "not_yet_proven" && targetDirection) {
-    gapSignals.push(`Din profil er endnu mere indirekte end direkte i forhold til ${targetDirection}`);
+    gapSignals.push(`Din profil er endnu ikke direkte nok dokumenteret i forhold til ${targetDirection}`);
   }
 
   if (strengthSignals.length === 0) {
