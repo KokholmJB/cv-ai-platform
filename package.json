@@ -7,6 +7,7 @@
     "build": "next build",
     "test:interview-scenarios": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/interview-scenarios/run-interview-scenarios.ts",
     "test:interview-manual-regression": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/interview-manual-regression/manual-regression.ts",
+    "test:interview-low-clarity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/interview-manual-regression/low-clarity-generated-regression.ts",
     "start": "next start",
     "lint": "eslint"
   },

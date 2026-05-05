@@ -385,6 +385,7 @@ const manualPersonas: ManualPersona[] = [
     ],
     needsUncertainty: false,
     suspiciousEarlyTurns: 2,
+    maxTurns: 10,
   },
   {
     id: "manual-product-transition-gap",
@@ -593,8 +594,25 @@ function detectReviewHints({
       profileModel,
     }),
   );
+  const negatedPeopleManagement = /(uden|ikke|ingen)\s+(formelt\s+)?(personaleansvar|people manager|leder for medarbejdere|personalechef)/iu;
+  const explicitPeopleManagementPush =
+    /(vil du|onsker du|naeste skridt|bevaege dig mod).{0,90}(blive|tage|have|ga efter).{0,40}(personaleansvar|people manager|leder for medarbejdere|personalechef)/iu;
   const driftMatches = persona.driftPatterns
-    .filter((item) => item.pattern.test(transcriptText))
+    .filter((item) => {
+      if (!item.pattern.test(transcriptText)) {
+        return false;
+      }
+
+      if (
+        item.label === "possible people-management push" &&
+        negatedPeopleManagement.test(transcriptText) &&
+        !explicitPeopleManagementPush.test(transcriptText)
+      ) {
+        return false;
+      }
+
+      return true;
+    })
     .map((item) => item.label);
 
   hints.push(completed ? "GREEN completed within max turns" : "YELLOW did not complete within max turns");
