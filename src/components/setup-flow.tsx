@@ -2,47 +2,9 @@
 
 import { useMemo, useState } from "react";
 
-type StepId =
-  | "intro"
-  | "dokumenter"
-  | "basisprofil"
-  | "jobpraeferencer"
-  | "personlig-stil"
-  | "opsummering";
+type StepId = "start" | "basisoplysninger" | "dokumenter" | "ai-interview" | "profiloverblik" | "klar";
+type ProfileTabId = "overblik" | "erfaring" | "jobretning" | "arbejdsprofil" | "naeste-skridt";
 
-type UploadedFile = {
-  name: string;
-  type: string;
-  size: string;
-  uploadedAt: string;
-};
-
-type SetupFormState = {
-  documentsSkipped: boolean;
-  profile: {
-    navn: string;
-    nuvaerendeTitel: string;
-    erfaring: string;
-    uddannelse: string;
-    lokation: string;
-  };
-  preferences: {
-    jobtype: string;
-    arbejdsform: string;
-    loenniveau: string;
-    transporttid: string;
-    geografi: string;
-    brancher: string;
-    undgaa: string;
-  };
-  style: {
-    formalitet: string;
-    laengde: string;
-    tone: string;
-  };
-};
-
-type ConfidenceLevel = "low" | "medium" | "high";
 type FocusArea =
   | "current_work_reality"
   | "level_seniority"
@@ -50,6 +12,17 @@ type FocusArea =
   | "direction_change"
   | "work_style_fit"
   | "mismatch_risk";
+
+type InterviewReasonCode =
+  | "INVALID_MODEL_JSON"
+  | "REPEATED_QUESTION"
+  | "INSUFFICIENT_COVERAGE"
+  | "INVALID_PROFILE_SUMMARY"
+  | "INVALID_MODEL_OUTPUT"
+  | "INVALID_PLAIN_DANISH"
+  | "LOW_QUALITY_ANSWER"
+  | "OPENAI_REQUEST_FAILED"
+  | "RETRY_EXHAUSTED";
 
 type InterviewCoverage = {
   currentWorkReality: boolean;
@@ -74,16 +47,7 @@ type InterviewState = {
   coverage: InterviewCoverage;
 };
 
-type InterviewReasonCode =
-  | "INVALID_MODEL_JSON"
-  | "REPEATED_QUESTION"
-  | "INSUFFICIENT_COVERAGE"
-  | "INVALID_PROFILE_SUMMARY"
-  | "INVALID_MODEL_OUTPUT"
-  | "INVALID_PLAIN_DANISH"
-  | "LOW_QUALITY_ANSWER"
-  | "OPENAI_REQUEST_FAILED"
-  | "RETRY_EXHAUSTED";
+type ConfidenceLevel = "low" | "medium" | "high";
 
 type ProfileSummary = {
   userProfileData: {
@@ -111,6 +75,27 @@ type ReadinessAssessment = {
   gapSignals: string[];
 };
 
+type ProfileModelEntry = {
+  key?: string;
+  statement?: string;
+};
+
+type ProfileCommunicationSignals = {
+  answerStyle?: string;
+  structureLevel?: string;
+  evidenceDensity?: string;
+  possibleSelfMinimizingLanguage?: boolean;
+  possibleOverlongExplanations?: boolean;
+};
+
+type ProfileModel = {
+  facts?: unknown[];
+  interpretations?: unknown[];
+  uncertainties?: unknown[];
+  hypotheses?: unknown[];
+  communicationSignals?: ProfileCommunicationSignals;
+};
+
 type InterviewResult =
   | {
       status: "idle";
@@ -118,6 +103,10 @@ type InterviewResult =
       focusArea: null;
       profileSummary: null;
       readinessAssessment: null;
+      profileModel: null;
+      hypothesisSummary: null;
+      uncertaintySummary: null;
+      communicationSignals: null;
     }
   | {
       status: "continue";
@@ -125,6 +114,10 @@ type InterviewResult =
       focusArea: FocusArea;
       profileSummary: null;
       readinessAssessment: null;
+      profileModel: null;
+      hypothesisSummary: null;
+      uncertaintySummary: null;
+      communicationSignals: null;
     }
   | {
       status: "complete";
@@ -132,72 +125,55 @@ type InterviewResult =
       focusArea: null;
       profileSummary: ProfileSummary;
       readinessAssessment: ReadinessAssessment;
+      profileModel: ProfileModel | null;
+      hypothesisSummary: unknown[] | null;
+      uncertaintySummary: unknown[] | null;
+      communicationSignals: ProfileCommunicationSignals | null;
     };
 
+type UploadedFile = {
+  name: string;
+  type: string;
+  size: string;
+  uploadedAt: string;
+};
+
+type SetupFormState = {
+  documentsSkipped: boolean;
+  profile: {
+    navn: string;
+    nuvaerendeTitel: string;
+    erfaring: string;
+    uddannelse: string;
+    lokation: string;
+  };
+  preferences: {
+    jobtype: string;
+    undgaa: string;
+  };
+};
+
 const steps: { id: StepId; label: string; eyebrow: string; title: string }[] = [
-  {
-    id: "intro",
-    label: "Intro",
-    eyebrow: "Trin 1",
-    title: "Sådan lærer JobPilot dig at kende",
-  },
-  {
-    id: "dokumenter",
-    label: "Dokumenter",
-    eyebrow: "Trin 2",
-    title: "Giv AI et stærkt udgangspunkt",
-  },
-  {
-    id: "basisprofil",
-    label: "Basisprofil",
-    eyebrow: "Trin 3",
-    title: "Byg din grundprofil",
-  },
-  {
-    id: "jobpraeferencer",
-    label: "Jobpræferencer",
-    eyebrow: "Trin 4",
-    title: "Fortæl hvad du faktisk søger",
-  },
-  {
-    id: "personlig-stil",
-    label: "Personlig stil",
-    eyebrow: "Trin 5",
-    title: "Sæt retning for sprog og tone",
-  },
-  {
-    id: "opsummering",
-    label: "Opsummering",
-    eyebrow: "Trin 6",
-    title: "Se hvad AI arbejder videre med",
-  },
+  { id: "start", label: "Start", eyebrow: "Trin 1", title: "Velkommen til JobPilot" },
+  { id: "basisoplysninger", label: "Basisoplysninger", eyebrow: "Trin 2", title: "Hurtige basisoplysninger" },
+  { id: "dokumenter", label: "Dokumenter", eyebrow: "Trin 3", title: "CV og dokumenter" },
+  { id: "ai-interview", label: "AI-interview", eyebrow: "Trin 4", title: "Kort interview med JobPilot" },
+  { id: "profiloverblik", label: "Profiloverblik", eyebrow: "Trin 5", title: "Dit første profiludkast" },
+  { id: "klar", label: "Klar", eyebrow: "Trin 6", title: "Klar til næste fase" },
+];
+
+const profileTabs: { id: ProfileTabId; label: string }[] = [
+  { id: "overblik", label: "Overblik" },
+  { id: "erfaring", label: "Erfaring" },
+  { id: "jobretning", label: "Jobretning" },
+  { id: "arbejdsprofil", label: "Arbejdsprofil" },
+  { id: "naeste-skridt", label: "Næste skridt" },
 ];
 
 const mockUploadedFiles: UploadedFile[] = [
-  {
-    name: "CV_Maria_Jensen_2026.pdf",
-    type: "CV",
-    size: "1,8 MB",
-    uploadedAt: "Uploadet for 2 min siden",
-  },
-  {
-    name: "Ansættelseskontrakt_Northwind.pdf",
-    type: "Ansættelseskontrakt",
-    size: "840 KB",
-    uploadedAt: "Uploadet for 4 min siden",
-  },
-  {
-    name: "Kandidatbevis_CBS.pdf",
-    type: "Uddannelsespapir",
-    size: "620 KB",
-    uploadedAt: "Uploadet for 5 min siden",
-  },
-];
-
-const aiInterviewQuestions = [
-  "Hvilke typer stillinger føles mest motiverende for dig lige nu?",
-  "Er der erfaring eller resultater, du altid gerne vil have fremhævet i dine ansøgninger?",
-  "Hvornår oplever du, at din tone skal være mere formel end personlig?",
+  { name: "CV_Maria_Jensen_2026.pdf", type: "CV", size: "1,8 MB", uploadedAt: "Uploadet for 2 min siden" },
+  { name: "Ansættelseskontrakt_Northwind.pdf", type: "Ansættelseskontrakt", size: "840 KB", uploadedAt: "Uploadet for 4 min siden" },
+  { name: "Kandidatbevis_CBS.pdf", type: "Uddannelsespapir", size: "620 KB", uploadedAt: "Uploadet for 5 min siden" },
 ];
 
 const initialState: SetupFormState = {
@@ -211,17 +187,7 @@ const initialState: SetupFormState = {
   },
   preferences: {
     jobtype: "Projektleder eller Product Manager",
-    arbejdsform: "Fuldtid",
-    loenniveau: "52.000-60.000 kr./md.",
-    transporttid: "Maks. 45 minutter hver vej",
-    geografi: "København og omegn",
-    brancher: "SaaS, konsulentbranchen og grøn omstilling",
     undgaa: "Rene salgsroller, nattevagter og meget tung rejseaktivitet",
-  },
-  style: {
-    formalitet: "Balanceret formel",
-    laengde: "Kort og præcis",
-    tone: "Direkte og varm",
   },
 };
 
@@ -246,87 +212,101 @@ const emptyInterviewState: InterviewState = {
   },
 };
 
-function ProgressPill({
-  active,
-  completed,
-  index,
-  label,
-}: {
-  active: boolean;
-  completed: boolean;
-  index: number;
-  label: string;
-}) {
+function formatMaybeValue(value: string | null) {
+  return value && value.trim().length > 0 ? value : "Ikke tilgængelig endnu";
+}
+
+function formatMaybeText(value: unknown, fallback = "Ikke tilgængelig endnu") {
+  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
+}
+
+function formatModelEntry(item: unknown) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return formatMaybeText(item);
+  const entry = item as ProfileModelEntry;
+  return formatMaybeText(entry.statement);
+}
+
+function normalizeSignalText(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\bno go\b/gi, "rammer der ikke passer")
+    .replace(/\bno-go\b/gi, "rammer der ikke passer")
+    .replace(/\bmismatch\b/gi, "mismatch")
+    .replace(/\bnot yet proven\b/gi, "kan afklares mere")
+    .replace(/\bnot strong enough for target\b/gi, "kan styrkes med flere eksempler")
+    .replace(/\bmangler\b/gi, "kan styrkes med")
+    .replace(/\bendnu ikke bevist\b/gi, "kan afklares mere")
+    .replace(/\bkræver mere dokumentation\b/gi, "kan afklares med flere eksempler")
+    .replace(/\bhul\b/gi, "område")
+    .trim();
+}
+
+function hasTechnicalPattern(value: string) {
+  const lower = value.toLowerCase();
   return (
-    <div
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-        active
-          ? "border-slate-900 bg-slate-950 text-white shadow-[0_16px_40px_rgba(15,23,42,0.14)]"
-          : completed
-            ? "border-cyan-100 bg-cyan-50 text-cyan-950"
-            : "border-slate-200 bg-white text-slate-600"
-      }`}
-    >
-      <div
-        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${
-          active
-            ? "bg-white/15 text-white"
-            : completed
-              ? "bg-cyan-100 text-cyan-900"
-              : "bg-slate-100 text-slate-500"
-        }`}
-      >
-        {index + 1}
-      </div>
-      <div>
-        <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${active ? "text-slate-200" : "text-slate-400"}`}>
-          Trin {index + 1}
-        </p>
-        <p className="text-sm font-semibold">{label}</p>
-      </div>
-    </div>
+    value.includes("_") ||
+    lower.includes("brugeren") ||
+    lower.includes("no-go") ||
+    lower.includes("hul") ||
+    lower.includes("huller") ||
+    lower.includes("mangler") ||
+    lower.includes("ikke stærkt nok") ||
+    lower.includes("endnu ikke bevist") ||
+    lower.includes("underbygget") ||
+    lower.includes("formelt") ||
+    lower.includes("datagrundlag") ||
+    lower.includes("matchvurdering")
   );
 }
 
-function formatMaybeValue(value: string | null) {
-  return value && value.trim().length > 0 ? value : "Ikke angivet endnu";
+function toUserFacingText(value: string) {
+  let text = normalizeSignalText(value);
+  text = text.replace(/\b[Bb]rugeren\b/g, "Du");
+  text = text.replace(/\bunderbygget\b/gi, "afklaret");
+  text = text.replace(/\bdatagrundlag\b/gi, "udgangspunkt");
+  text = text.replace(/\bmatchvurdering\b/gi, "vurdering");
+  text = text.replace(/\bno-go\b/gi, "rammer der ikke passer");
+  text = text.replace(/\bformelt\b/gi, "");
+  text = text.replace(/\s{2,}/g, " ").trim();
+  return text;
 }
 
-function formatConfidenceLabel(confidence: ConfidenceLevel) {
-  switch (confidence) {
-    case "high":
-      return "Høj";
-    case "medium":
-      return "Mellem";
-    case "low":
-      return "Lav";
+function uniqueNonEmpty(items: string[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const rawItem of items) {
+    const normalized = normalizeSignalText(rawItem);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
   }
+  return result;
 }
 
-function formatReadinessLevelLabel(level: ReadinessAssessment["level"]) {
-  switch (level) {
-    case "stronger_profile":
-      return "Stærk profil";
-    case "not_strong_enough_for_target":
-      return "Endnu ikke stærk nok til målretningen";
-    case "minimum_usable":
-    default:
-      return "Brugbar profil";
-  }
+function toStatementList(entries: unknown[] | null | undefined) {
+  if (!entries || entries.length === 0) return [];
+  return uniqueNonEmpty(
+    entries
+      .map((entry) => toUserFacingText(formatModelEntry(entry)))
+      .filter((entry) => !hasTechnicalPattern(entry)),
+  );
 }
 
-function formatTargetDirectionSupportLabel(
-  targetDirectionSupport: ReadinessAssessment["targetDirectionSupport"],
-) {
-  switch (targetDirectionSupport) {
-    case "strong":
-      return "Stærkt understøttet";
-    case "not_yet_proven":
-      return "Endnu ikke bevist";
-    case "partial":
-    default:
-      return "Delvist understøttet";
-  }
+function isGapLike(text: string) {
+  const value = text.toLowerCase();
+  return (
+    value.includes("mangler") ||
+    value.includes("uklar") ||
+    value.includes("usikker") ||
+    value.includes("ikke tydelig") ||
+    value.includes("ikke afklaret") ||
+    value.includes("ikke dokumenteret") ||
+    value.includes("kræver") ||
+    value.includes("gap") ||
+    value.includes("svag")
+  );
 }
 
 function getInterviewErrorMessage(reasonCode?: InterviewReasonCode) {
@@ -334,23 +314,127 @@ function getInterviewErrorMessage(reasonCode?: InterviewReasonCode) {
     case "LOW_QUALITY_ANSWER":
       return "Svaret er for kort eller uklart til at føre interviewet videre.";
     case "INSUFFICIENT_COVERAGE":
-      return "JobPilot mangler stadig nok afklaring til at gå videre. Prøv et mere konkret svar.";
+      return "JobPilot kan bruge lidt mere afklaring. Prøv gerne et mere konkret svar.";
     case "RETRY_EXHAUSTED":
     case "OPENAI_REQUEST_FAILED":
       return "JobPilot kunne ikke hente næste spørgsmål lige nu. Prøv igen om et øjeblik.";
-    case "INVALID_MODEL_JSON":
-    case "INVALID_MODEL_OUTPUT":
-    case "INVALID_PROFILE_SUMMARY":
-    case "INVALID_PLAIN_DANISH":
-    case "REPEATED_QUESTION":
-      return "JobPilot kunne ikke lave et stabilt næste trin lige nu. Prøv igen.";
     default:
       return "JobPilot kunne ikke hente næste spørgsmål lige nu.";
   }
 }
 
+function formatFocusAreaLabel(focusArea: FocusArea) {
+  const labels: Record<FocusArea, string> = {
+    current_work_reality: "Nuværende arbejde",
+    level_seniority: "Ansvar og niveau",
+    transferable_strengths: "Overførbare styrker",
+    direction_change: "Jobretning",
+    work_style_fit: "Arbejdsstil og trivsel",
+    mismatch_risk: "Rammer der ikke passer",
+  };
+  return labels[focusArea] ?? focusArea;
+}
+
+type UserFacingSetupProfile = {
+  overblik: {
+    kortFortalt: string;
+    hvadJobpilotSer: string;
+    saadanBrugesProfilen: string;
+  };
+  erfaring: {
+    erfaringstekst: string;
+    vaerdibidrag: string;
+    senereEksempler: string;
+  };
+  jobretning: {
+    retningLigeNu: string;
+    pejlemaerke: string;
+    naesteAfklaring: string;
+  };
+  arbejdsprofil: {
+    rammerPasserGodt: string;
+    arbejdsstil: string;
+    rammerPasserMindreGodt: string;
+  };
+  naesteSkridt: {
+    handlinger: [string, string][];
+  };
+};
+
+function buildUserFacingSetupProfile(input: {
+  name: string;
+  currentRole: string;
+  yearsExperience: string;
+  targetDirection: string;
+  workStyleFit: string;
+  directionOfChange: string;
+  strengths: string[];
+  communicationSignals: ProfileCommunicationSignals | null;
+  readinessLevel: ReadinessAssessment["level"];
+  hasProfileModelSignals: boolean;
+  userAvoids: string;
+}): UserFacingSetupProfile {
+  const role = input.currentRole || "din nuværende rolle";
+  const experience = input.yearsExperience || "den erfaring du har opbygget";
+  const target = input.targetDirection || "en retning, der passer til din erfaring";
+  const topStrengths = input.strengths.slice(0, 3);
+  const strengthsText = topStrengths.length > 0 ? topStrengths.join(", ") : "overblik, koordinering og samarbejde på tværs";
+
+  const communicationLine =
+    input.communicationSignals?.answerStyle === "concise"
+      ? "Du formulerer dig kort og direkte, hvilket giver en klar profil med fokus på det vigtigste."
+      : "Du giver et godt første billede af, hvordan du arbejder og træffer valg i praksis.";
+
+  const responsibilityLine =
+    input.readinessLevel === "minimum_usable"
+      ? "Det tyder på, at du trives med tydeligt ansvar og konkrete opgaver."
+      : "JobPilot ser tegn på, at du kan skabe fremdrift i roller med ansvar og samarbejde.";
+
+  const avoidLine = input.userAvoids
+    ? `Miljøer med ${input.userAvoids.toLowerCase()} passer typisk mindre godt til dine præferencer.`
+    : "Miljøer med uklare forventninger eller vedvarende højt pres kan passe mindre godt.";
+
+  return {
+    overblik: {
+      kortFortalt: `JobPilot ser en profil med erfaring fra ${role.toLowerCase()}, koordinering og samarbejde på tværs.`,
+      hvadJobpilotSer: `Din retning peger mod ${target.toLowerCase()}, og din erfaring fra ${experience.toLowerCase()} kan bruges aktivt.`,
+      saadanBrugesProfilen: "Profilen kan bruges som et første afsæt til at vurdere relevante jobopslag og målrette dit næste CV-udkast.",
+    },
+    erfaring: {
+      erfaringstekst: `Du kommer med erfaring fra ${role.toLowerCase()} og har arbejdet med ${experience.toLowerCase()}.`,
+      vaerdibidrag: "Din erfaring peger især på koordinering, overblik, samarbejde og ansvar for at få opgaver videre i praksis.",
+      senereEksempler:
+        "Senere kan du tilføje 1-2 konkrete eksempler, hvis du vil gøre CV og ansøgninger mere præcise.",
+    },
+    jobretning: {
+      retningLigeNu: `Din ønskede retning peger mod ${target.toLowerCase()}.`,
+      pejlemaerke: "Retningen kan bruges som et første pejlemærke. Når du tilføjer et konkret jobopslag, kan JobPilot teste retningen mere præcist.",
+      naesteAfklaring: "Hvis du vil, kan JobPilot senere stille få opfølgende spørgsmål for at gøre retningen skarpere.",
+    },
+    arbejdsprofil: {
+      rammerPasserGodt: "Det tyder på, at du arbejder bedst med tydelige rammer, klar prioritering og samarbejde, hvor ansvar er afstemt.",
+      arbejdsstil: `${communicationLine} ${responsibilityLine} JobPilot hjælper med at gøre dine erfaringer tydeligere i CV og ansøgninger.`,
+      rammerPasserMindreGodt: avoidLine,
+    },
+    naesteSkridt: {
+      handlinger: [
+        ["Tilføj første jobopslag", "Vælg et konkret opslag, så JobPilot kan vurdere fit og prioritere næste handlinger."],
+        ["Tilføj 1-2 konkrete eksempler senere", "Beskriv kort en situation med ansvar, samarbejde eller resultat, når det passer dig."],
+        ["Brug profilen til CV og ansøgning", "Brug profiludkastet som retning for de vigtigste budskaber i dit materiale."],
+        [
+          "Svar på få ekstra spørgsmål senere",
+          input.hasProfileModelSignals
+            ? "Hvis du vil gøre profilen skarpere, kan JobPilot stille et par korte opfølgende spørgsmål."
+            : "Du kan altid vende tilbage og gøre profilen endnu mere præcis med få ekstra svar.",
+        ],
+      ],
+    },
+  };
+}
+
 export function SetupFlow() {
   const [currentStep, setCurrentStep] = useState(0);
+  const [activeProfileTab, setActiveProfileTab] = useState<ProfileTabId>("overblik");
   const [formState, setFormState] = useState<SetupFormState>(initialState);
   const [interviewResult, setInterviewResult] = useState<InterviewResult>({
     status: "idle",
@@ -358,6 +442,10 @@ export function SetupFlow() {
     focusArea: null,
     profileSummary: null,
     readinessAssessment: null,
+    profileModel: null,
+    hypothesisSummary: null,
+    uncertaintySummary: null,
+    communicationSignals: null,
   });
   const [interviewAnswer, setInterviewAnswer] = useState("");
   const [interviewErrorMessage, setInterviewErrorMessage] = useState<string | null>(null);
@@ -367,43 +455,17 @@ export function SetupFlow() {
   const [isInterviewLoading, setIsInterviewLoading] = useState(false);
   const [interviewState, setInterviewState] = useState<InterviewState>(emptyInterviewState);
 
-  const progressValue = useMemo(
-    () => Math.round(((currentStep + 1) / steps.length) * 100),
-    [currentStep],
-  );
-
   const current = steps[currentStep];
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === steps.length - 1;
+  const progressValue = useMemo(() => Math.round(((currentStep + 1) / steps.length) * 100), [currentStep]);
 
   function updateProfile(field: keyof SetupFormState["profile"], value: string) {
-    setFormState((previous) => ({
-      ...previous,
-      profile: {
-        ...previous.profile,
-        [field]: value,
-      },
-    }));
+    setFormState((previous) => ({ ...previous, profile: { ...previous.profile, [field]: value } }));
   }
 
   function updatePreferences(field: keyof SetupFormState["preferences"], value: string) {
-    setFormState((previous) => ({
-      ...previous,
-      preferences: {
-        ...previous.preferences,
-        [field]: value,
-      },
-    }));
-  }
-
-  function updateStyle(field: keyof SetupFormState["style"], value: string) {
-    setFormState((previous) => ({
-      ...previous,
-      style: {
-        ...previous.style,
-        [field]: value,
-      },
-    }));
+    setFormState((previous) => ({ ...previous, preferences: { ...previous.preferences, [field]: value } }));
   }
 
   function goNext() {
@@ -415,10 +477,7 @@ export function SetupFlow() {
   }
 
   async function requestInterviewTurn(lastAssistantQuestion: string | null, lastUserAnswer: string | null) {
-    if (isInterviewLoading) {
-      return;
-    }
-
+    if (isInterviewLoading) return;
     setIsInterviewLoading(true);
     setInterviewErrorMessage(null);
     setInterviewErrorReasonCode(null);
@@ -428,9 +487,7 @@ export function SetupFlow() {
     try {
       const response = await fetch("/api/onboarding/interview", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phase: "initial",
           profileDraft: {
@@ -459,6 +516,10 @@ export function SetupFlow() {
             profileSummary: ProfileSummary;
             interviewState: InterviewState;
             readinessAssessment: ReadinessAssessment;
+            profileModel?: ProfileModel;
+            hypothesisSummary?: unknown[];
+            uncertaintySummary?: unknown[];
+            communicationSignals?: ProfileCommunicationSignals;
           }
         | {
             ok: false;
@@ -472,19 +533,6 @@ export function SetupFlow() {
         const reasonCode = data.ok ? undefined : data.reasonCode;
         const lastFailureReasonCode = data.ok ? undefined : data.lastFailureReasonCode;
         const retryTrail = data.ok ? undefined : data.retryTrail;
-
-        if (process.env.NODE_ENV !== "production" && reasonCode) {
-          console.debug("[interview] failure reasonCode:", reasonCode);
-        }
-
-        if (process.env.NODE_ENV !== "production" && lastFailureReasonCode) {
-          console.debug("[interview] lastFailureReasonCode:", lastFailureReasonCode);
-        }
-
-        if (process.env.NODE_ENV !== "production" && retryTrail?.length) {
-          console.debug("[interview] retryTrail:", retryTrail);
-        }
-
         setInterviewErrorMessage(getInterviewErrorMessage(reasonCode));
         setInterviewErrorReasonCode(reasonCode ?? null);
         setInterviewLastFailureReasonCode(lastFailureReasonCode ?? null);
@@ -500,6 +548,10 @@ export function SetupFlow() {
           focusArea: null,
           profileSummary: data.profileSummary,
           readinessAssessment: data.readinessAssessment,
+          profileModel: data.profileModel ?? null,
+          hypothesisSummary: data.hypothesisSummary ?? null,
+          uncertaintySummary: data.uncertaintySummary ?? null,
+          communicationSignals: data.communicationSignals ?? data.profileModel?.communicationSignals ?? null,
         });
         setInterviewAnswer("");
         return;
@@ -512,6 +564,10 @@ export function SetupFlow() {
         focusArea: data.focusArea,
         profileSummary: null,
         readinessAssessment: null,
+        profileModel: null,
+        hypothesisSummary: null,
+        uncertaintySummary: null,
+        communicationSignals: null,
       });
       setInterviewAnswer("");
     } catch {
@@ -525,10 +581,7 @@ export function SetupFlow() {
   }
 
   async function startInterview() {
-    if (isInterviewLoading) {
-      return;
-    }
-
+    if (isInterviewLoading) return;
     setInterviewErrorMessage(null);
     setInterviewErrorReasonCode(null);
     setInterviewLastFailureReasonCode(null);
@@ -540,17 +593,17 @@ export function SetupFlow() {
       focusArea: null,
       profileSummary: null,
       readinessAssessment: null,
+      profileModel: null,
+      hypothesisSummary: null,
+      uncertaintySummary: null,
+      communicationSignals: null,
     });
     await requestInterviewTurn(null, null);
   }
 
   async function continueInterview() {
-    if (interviewResult.status !== "continue" || isInterviewLoading) {
-      return;
-    }
-
+    if (interviewResult.status !== "continue" || isInterviewLoading) return;
     const trimmedAnswer = interviewAnswer.trim();
-
     if (!trimmedAnswer) {
       setInterviewErrorMessage("Skriv et svar for at fortsætte.");
       setInterviewErrorReasonCode(null);
@@ -558,108 +611,22 @@ export function SetupFlow() {
       setInterviewRetryTrail([]);
       return;
     }
-
     await requestInterviewTurn(interviewResult.question, trimmedAnswer);
-  }
-
-  function renderCompleteSummary(profileSummary: ProfileSummary, readinessAssessment: ReadinessAssessment) {
-    return (
-      <div className="mt-6 space-y-5">
-        <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Fase 1 færdig
-          </p>
-          <p className="mt-3 text-sm leading-7 text-slate-700">
-            JobPilot har nu nok information til en første profilvurdering.
-          </p>
-        </div>
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SummaryCard
-            title="Dine profiloplysninger"
-            items={[
-              ["Navn", formatMaybeValue(profileSummary.userProfileData.name)],
-              ["Nuværende rolle", formatMaybeValue(profileSummary.userProfileData.currentRole)],
-              ["Erfaring", formatMaybeValue(profileSummary.userProfileData.yearsExperience)],
-              ["Ønsket retning", formatMaybeValue(profileSummary.userProfileData.targetDirection)],
-            ]}
-          />
-          <SummaryCard
-            title="JobPilots profilvurdering"
-            items={[
-              ["Nuværende arbejdssituation", profileSummary.aiProfileCore.currentWorkReality],
-              ["Niveau og senioritet", profileSummary.aiProfileCore.levelSeniority],
-              ["Retning for skift", profileSummary.aiProfileCore.directionOfChange],
-              ["Arbejdsstil og match", profileSummary.aiProfileCore.workStyleFit],
-              ["Sikkerhedsniveau", formatConfidenceLabel(profileSummary.aiProfileCore.confidence)],
-            ]}
-          />
-        </div>
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SummaryCard
-            title="Overførbare styrker"
-            items={profileSummary.aiProfileCore.transferableStrengths.map((item, index) => [
-              `Styrke ${index + 1}`,
-              item,
-            ])}
-          />
-          <SummaryCard
-            title="Mulige mismatch-risici"
-            items={
-              profileSummary.aiProfileCore.mismatchRisks.length > 0
-                ? profileSummary.aiProfileCore.mismatchRisks.map((item, index) => [`Risiko ${index + 1}`, item])
-                : [["Status", "Ingen tydelige mismatch-risici markeret i fase 1."]]
-            }
-          />
-        </div>
-
-        <div className="rounded-[1.25rem] border border-slate-200 bg-white p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Vurdering af profilstyrke
-          </p>
-          <div className="mt-4 grid gap-5 lg:grid-cols-2">
-            <SummaryCard
-              title="Samlet vurdering"
-              items={[
-                ["Profilstyrke", formatReadinessLevelLabel(readinessAssessment.level)],
-                ["Understøttelse af målretning", formatTargetDirectionSupportLabel(readinessAssessment.targetDirectionSupport)],
-                ["Vurdering", readinessAssessment.summary],
-              ]}
-            />
-            <SummaryCard
-              title="Styrker og mangler"
-              items={[
-                ["Stærke signaler", readinessAssessment.strengthSignals.join(" · ")],
-                ["Huller i profilen", readinessAssessment.gapSignals.join(" · ")],
-              ]}
-            />
-          </div>
-        </div>
-      </div>
-    );
   }
 
   function renderInterviewPanel() {
     return (
-      <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Første AI-spørgsmål
-          </p>
-          <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-            Start den første interviewrunde
-          </h3>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-            JobPilot bruger din basisprofil og din jobretning til at stille det første målrettede spørgsmål.
-          </p>
-        </div>
+      <div className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-[0_14px_30px_rgba(15,23,42,0.05)]">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">AI-interview</p>
+        <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">Et kort interview, der gør profilen skarpere</h3>
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          JobPilot stiller nogle få opfølgende spørgsmål for at forstå din erfaring, dine styrker, din retning og hvilke rammer du trives bedst i.
+        </p>
+        <p className="mt-2 text-sm leading-7 text-slate-600">Du behøver ikke svare perfekt. JobPilot hjælper med at få profilen frem.</p>
 
         {interviewResult.status === "idle" ? (
-          <div className="mt-6 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
-            <p className="text-sm leading-7 text-slate-700">
-              Når du er klar, kan du starte den første AI-runde med knappen nederst.
-            </p>
+          <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm text-slate-700">Tryk &quot;Start AI-interview&quot; nederst for at begynde.</p>
           </div>
         ) : null}
 
@@ -667,27 +634,17 @@ export function SetupFlow() {
           <div className="mt-6 space-y-4">
             <div className="rounded-[1.25rem] border border-cyan-100 bg-cyan-50/80 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-950">
-                Fokusområde: {interviewResult.focusArea}
+                Fokusområde: {formatFocusAreaLabel(interviewResult.focusArea)}
               </p>
               <p className="mt-3 text-base leading-7 text-slate-800">{interviewResult.question}</p>
             </div>
-
-            <TextAreaField
-              label="Dit svar"
-              value={interviewAnswer}
-              onChange={setInterviewAnswer}
-              rows={4}
-            />
-            <p className="text-sm leading-6 text-slate-500">
-              Du må gerne svare kort eller langt. Konkrete eksempler hjælper. Hvis du er i tvivl, så beskriv situationen, dit ansvar og hvad resultatet blev.
-            </p>
-
+            <TextAreaField label="Dit svar" value={interviewAnswer} onChange={setInterviewAnswer} rows={4} />
             <div className="flex justify-end">
               <button
                 type="button"
                 onClick={continueInterview}
                 disabled={isInterviewLoading}
-                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
                 {isInterviewLoading ? "Henter næste spørgsmål..." : "Fortsæt"}
               </button>
@@ -695,9 +652,13 @@ export function SetupFlow() {
           </div>
         ) : null}
 
-        {interviewResult.status === "complete" && interviewResult.profileSummary && interviewResult.readinessAssessment
-          ? renderCompleteSummary(interviewResult.profileSummary, interviewResult.readinessAssessment)
-          : null}
+        {interviewResult.status === "complete" ? (
+          <div className="mt-6 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-5">
+            <p className="text-sm leading-7 text-emerald-800">
+              Interviewet er gennemført. Gå videre til <strong>Profiloverblik</strong> for at se resultatet.
+            </p>
+          </div>
+        ) : null}
 
         {interviewErrorMessage ? (
           <div className="mt-6 rounded-[1.25rem] border border-rose-200 bg-rose-50 p-5">
@@ -705,12 +666,8 @@ export function SetupFlow() {
             {process.env.NODE_ENV !== "production" && interviewErrorReasonCode ? (
               <div className="mt-2 space-y-1 text-xs font-medium uppercase tracking-[0.12em] text-rose-500">
                 <p>Teknisk kode: {interviewErrorReasonCode}</p>
-                {interviewLastFailureReasonCode ? (
-                  <p>Sidste fejlkode: {interviewLastFailureReasonCode}</p>
-                ) : null}
-                {interviewRetryTrail.length > 0 ? (
-                  <p>Retry-forløb: {interviewRetryTrail.join(" -> ")}</p>
-                ) : null}
+                {interviewLastFailureReasonCode ? <p>Sidste fejlkode: {interviewLastFailureReasonCode}</p> : null}
+                {interviewRetryTrail.length > 0 ? <p>Retry-forløb: {interviewRetryTrail.join(" → ")}</p> : null}
               </div>
             ) : null}
           </div>
@@ -719,68 +676,249 @@ export function SetupFlow() {
     );
   }
 
+  function renderProfileTabs() {
+    if (interviewResult.status !== "complete" || !interviewResult.profileSummary || !interviewResult.readinessAssessment) {
+      return (
+        <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+          <p className="text-sm leading-7 text-slate-700">Profiloverblikket bliver tilgængeligt, når AI-interviewet er gennemført.</p>
+        </div>
+      );
+    }
+
+    const { profileSummary, readinessAssessment, profileModel, communicationSignals } = interviewResult;
+    const effectiveCommunicationSignals = communicationSignals ?? profileModel?.communicationSignals ?? null;
+    const profileStrengths = uniqueNonEmpty(
+      profileSummary.aiProfileCore.transferableStrengths.map(toUserFacingText).filter((item) => !hasTechnicalPattern(item)),
+    );
+    const hasProfileModelSignals = Boolean(
+      (profileModel?.facts?.length ?? 0) > 0 ||
+        (profileModel?.interpretations?.length ?? 0) > 0 ||
+        (profileModel?.uncertainties?.length ?? 0) > 0 ||
+        (profileModel?.hypotheses?.length ?? 0) > 0,
+    );
+
+    const displayProfile = buildUserFacingSetupProfile({
+      name: formState.profile.navn,
+      currentRole: formatMaybeValue(profileSummary.userProfileData.currentRole),
+      yearsExperience: formatMaybeValue(profileSummary.userProfileData.yearsExperience),
+      targetDirection: formatMaybeValue(profileSummary.userProfileData.targetDirection),
+      workStyleFit: toUserFacingText(formatMaybeText(profileSummary.aiProfileCore.workStyleFit)),
+      directionOfChange: toUserFacingText(formatMaybeText(profileSummary.aiProfileCore.directionOfChange)),
+      strengths: profileStrengths,
+      communicationSignals: effectiveCommunicationSignals,
+      readinessLevel: readinessAssessment.level,
+      hasProfileModelSignals,
+      userAvoids: formState.preferences.undgaa,
+    });
+
+    const tabContent: Record<ProfileTabId, React.ReactNode> = {
+      overblik: (
+        <div className="space-y-5">
+          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+            <h3 className="text-lg font-semibold tracking-tight text-slate-950">Din første JobPilot-profil</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-700">
+              Her er dit første profiludkast. Det er ikke en endelig vurdering, men JobPilots første forståelse af din erfaring, retning og arbejdsprofil.
+              Du kan senere udbygge den med flere eksempler.
+            </p>
+          </div>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <SummaryCard
+              title="Kort fortalt"
+              items={[
+                ["Sådan forstår JobPilot dig", displayProfile.overblik.kortFortalt],
+                ["Det JobPilot især ser", displayProfile.overblik.hvadJobpilotSer],
+                ["Sådan kan profilen bruges", displayProfile.overblik.saadanBrugesProfilen],
+              ]}
+            />
+            <SummaryCard
+              title="Det du kommer med"
+              items={[
+                ["Nuværende rolle", formatMaybeValue(profileSummary.userProfileData.currentRole)],
+                ["Erfaring", formatMaybeValue(profileSummary.userProfileData.yearsExperience)],
+                ["Retning lige nu", formatMaybeValue(profileSummary.userProfileData.targetDirection)],
+              ]}
+            />
+          </div>
+        </div>
+      ),
+      erfaring: (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SummaryCard
+            title="Din erfaring i praksis"
+            items={[
+              ["Din erfaring", displayProfile.erfaring.erfaringstekst],
+              ["Det din erfaring peger på", displayProfile.erfaring.vaerdibidrag],
+              ["Hvis du vil gøre profilen skarpere", displayProfile.erfaring.senereEksempler],
+            ]}
+          />
+          <SummaryCard
+            title="Sådan kan profilen bruges"
+            items={[
+              ["I din jobsøgning", "Brug profilen til at prioritere opslag, hvor din erfaring og arbejdsform passer naturligt ind."],
+              ["Til CV og ansøgning", "Lad profilen styre, hvilke erfaringer og styrker der skal stå tydeligst i dine materialer."],
+              ["I næste dialog med JobPilot", "JobPilot kan bygge videre på samme profil, når du vil gøre den mere præcis."],
+            ]}
+          />
+        </div>
+      ),
+      jobretning: (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SummaryCard
+            title="Din retning lige nu"
+            items={[
+              ["Retning", displayProfile.jobretning.retningLigeNu],
+              ["Som pejlemærke", displayProfile.jobretning.pejlemaerke],
+              ["Hvis du vil afklare mere", displayProfile.jobretning.naesteAfklaring],
+            ]}
+          />
+          <SummaryCard
+            title="Sådan bruger du retningen"
+            items={[
+              ["Kort fortalt", "Retningen er et godt startpunkt for de første job, du vil afprøve."],
+              ["I praksis", "Vælg et jobopslag og lad JobPilot vurdere, hvordan din profil matcher rollen."],
+              ["Videre herfra", "Du kan altid justere retningen, når du får nye erfaringer eller bliver mere afklaret."],
+            ]}
+          />
+        </div>
+      ),
+      arbejdsprofil: (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SummaryCard
+            title="Rammer der passer godt"
+            items={[
+              ["Kort fortalt", displayProfile.arbejdsprofil.rammerPasserGodt],
+              ["Din arbejdsstil", displayProfile.arbejdsprofil.arbejdsstil],
+              ["Ansvar og tempo", "JobPilot ser tegn på, at du trives bedst, når ansvar, forventninger og samarbejde er tydeligt afstemt."],
+            ]}
+          />
+          <SummaryCard
+            title="Rammer der passer mindre godt"
+            items={[
+              ["Miljø og samarbejde", displayProfile.arbejdsprofil.rammerPasserMindreGodt],
+              ["Kommunikation", "Det tyder på, at du foretrækker klar kommunikation og tydelige prioriteringer."],
+              ["I praksis", "Roller med varigt uklare mål eller uforudsigelige rammer kan være mindre attraktive for dig."],
+            ]}
+          />
+        </div>
+      ),
+      "naeste-skridt": (
+        <SummaryCard
+          title="Næste bedste skridt"
+          items={displayProfile.naesteSkridt.handlinger}
+        />
+      ),
+    };
+
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-wrap gap-2 rounded-[1.25rem] border border-slate-200 bg-slate-50 p-3">
+          {profileTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveProfileTab(tab.id)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                activeProfileTab === tab.id ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {tabContent[activeProfileTab]}
+      </div>
+    );
+  }
+
   function renderStep() {
     switch (current.id) {
-      case "intro":
+      case "start":
         return (
           <div className="space-y-6">
             <div className="rounded-[1.75rem] border border-cyan-100 bg-cyan-50/80 p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-950">
-                Hvad der sker nu
-              </p>
-              <p className="mt-4 max-w-2xl text-base leading-8 text-slate-700">
-                JobPilot lærer dig at kende gennem dokumenter, præferencer og korte spørgsmål. Målet
-                er ikke at presse dig ind i en skabelon, men at skabe naturlige og målrettede CV&apos;er,
-                ansøgninger og jobvurderinger, som faktisk føles som dig.
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-950">Sådan foregår det</p>
+              <p className="mt-4 max-w-3xl text-base leading-8 text-slate-700">
+                Vi starter med hurtige basisoplysninger og dit CV, fortsætter med et kort interview og slutter med et personligt profiludkast.
               </p>
             </div>
-
-            <div className="grid gap-5 md:grid-cols-3">
-              {[
-                {
-                  title: "Dokumenter først",
-                  description:
-                    "Dine eksisterende filer hjælper AI med at forstå erfaring, roller og resultater hurtigere.",
-                },
-                {
-                  title: "Spørgsmål bagefter",
-                  description:
-                    "Du får opfølgende spørgsmål, hvor der mangler nuance eller tydelig retning i din profil.",
-                },
-                {
-                  title: "Bedre output",
-                  description:
-                    "Jo bedre onboarding, desto mere præcist kan JobPilot tilpasse materiale til konkrete stillinger.",
-                },
-              ].map((card) => (
-                <article
-                  key={card.title}
-                  className="rounded-[1.5rem] border border-slate-200/80 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]"
-                >
-                  <h3 className="text-lg font-semibold tracking-tight text-slate-950">{card.title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{card.description}</p>
-                </article>
-              ))}
+          </div>
+        );
+      case "basisoplysninger":
+        return (
+          <div className="space-y-5">
+            <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-5">
+              <p className="text-sm leading-7 text-slate-700">
+                Kun det vigtigste lige nu. Du kan altid justere og udbygge profilen senere.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField label="Navn" value={formState.profile.navn} onChange={(value) => updateProfile("navn", value)} />
+              <FormField
+                label="Nuværende titel"
+                value={formState.profile.nuvaerendeTitel}
+                onChange={(value) => updateProfile("nuvaerendeTitel", value)}
+              />
+              <FormField label="Lokation" value={formState.profile.lokation} onChange={(value) => updateProfile("lokation", value)} />
+              <FormField
+                label="Overordnet jobretning"
+                value={formState.preferences.jobtype}
+                onChange={(value) => updatePreferences("jobtype", value)}
+              />
+              <TextAreaField
+                label="Kort om erfaring"
+                value={formState.profile.erfaring}
+                onChange={(value) => updateProfile("erfaring", value)}
+                className="md:col-span-2"
+                rows={3}
+              />
+              <TextAreaField
+                label="Uddannelse og kurser"
+                value={formState.profile.uddannelse}
+                onChange={(value) => updateProfile("uddannelse", value)}
+                className="md:col-span-2"
+                rows={3}
+              />
             </div>
           </div>
         );
       case "dokumenter":
         return (
           <div className="space-y-6">
-            <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 p-6 sm:p-8">
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-6">
+              <h3 className="text-lg font-semibold tracking-tight text-slate-950">CV er centralt i JobPilot</h3>
+              <p className="mt-3 text-sm leading-7 text-slate-700">
+                JobPilot bruger CV’et som primær faktakilde til erfaring, roller og uddannelse. I den rigtige produktflow er CV-upload derfor obligatorisk.
+              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                Har du ikke et CV endnu, kan du lave et enkelt dokument med de vigtigste oplysninger. Senere kan vi også støtte en formular-baseret CV-opbygning direkte i JobPilot.
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <SummaryCard
+                title="Har du ikke et CV?"
+                items={[
+                  ["Forslag", "Lav et enkelt dokument med dine vigtigste oplysninger og upload det som midlertidigt CV."],
+                  ["Accepterede formater", "PDF, Word, Google Docs (eksporteret), OpenOffice/LibreOffice (eksporteret) eller enkel tekstfil."],
+                ]}
+              />
+              <SummaryCard
+                title="Minimumsindhold i dokumentet"
+                items={[
+                  ["Kontakt og navn", "Navn og kontaktoplysninger"],
+                  ["Erfaring", "Nuværende/seneste rolle, tidligere roller og kerneansvar"],
+                  ["Baggrund", "Uddannelse/kurser samt vigtige resultater eller projekter"],
+                  ["Retning", "Jobretning hvis du kender den"],
+                ]}
+              />
+            </div>
+
+            <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white p-6 sm:p-8">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                 <div className="max-w-2xl">
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Uploadområde
-                  </p>
-                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                    Del dine vigtigste dokumenter med JobPilot
-                  </h3>
-                  <p className="mt-3 text-base leading-7 text-slate-600">
-                    Upload dit CV, ansættelseskontrakter, uddannelsespapirer og andre relevante
-                    dokumenter. Der er ingen rigtig upload endnu, men UI&apos;et viser, hvordan
-                    flowet vil fungere.
-                  </p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Uploadområde</p>
+                  <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Del dine vigtigste dokumenter</h3>
                 </div>
                 <button
                   type="button"
@@ -792,257 +930,85 @@ export function SetupFlow() {
                   }
                   className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
                 >
-                  {formState.documentsSkipped ? "Fortsæt med dokumenter" : "Spring over for nu"}
+                  {formState.documentsSkipped ? "Fortsæt med dokumenter" : "Spring over i denne demo"}
                 </button>
               </div>
-
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {["CV", "Ansættelseskontrakter", "Uddannelsespapirer", "Andre dokumenter"].map(
-                  (label) => (
-                    <div
-                      key={label}
-                      className="rounded-[1.5rem] border border-white/90 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]"
-                    >
-                      <p className="text-sm font-medium text-slate-500">{label}</p>
-                      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                        Slip filer her eller vælg dokument
-                      </div>
-                    </div>
-                  ),
-                )}
-              </div>
             </div>
 
-            <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Klargjorte filer
+            <div className="space-y-4">
+              {mockUploadedFiles.map((file) => (
+                <div key={file.name} className="rounded-[1.25rem] border border-slate-200/70 bg-white p-4">
+                  <p className="font-semibold text-slate-950">{file.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {file.type} • {file.size} • {file.uploadedAt}
                   </p>
-                  <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-                    Mockliste over uploadede dokumenter
-                  </h3>
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                  {formState.documentsSkipped ? "Springes over midlertidigt" : "3 filer registreret"}
-                </span>
-              </div>
-
-              <div className="mt-6 space-y-4">
-                {mockUploadedFiles.map((file) => (
-                  <div
-                    key={file.name}
-                    className="flex flex-col gap-4 rounded-[1.25rem] border border-slate-200/70 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold text-slate-950">{file.name}</p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {file.type} · {file.size} · {file.uploadedAt}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="inline-flex h-10 items-center justify-center rounded-full border border-slate-200 px-4 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      Vis preview
-                    </button>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         );
-      case "basisprofil":
-        return (
-          <div className="grid gap-5 md:grid-cols-2">
-            <FormField
-              label="Navn"
-              value={formState.profile.navn}
-              onChange={(value) => updateProfile("navn", value)}
-            />
-            <FormField
-              label="Nuværende titel"
-              value={formState.profile.nuvaerendeTitel}
-              onChange={(value) => updateProfile("nuvaerendeTitel", value)}
-            />
-            <FormField
-              label="Lokation"
-              value={formState.profile.lokation}
-              onChange={(value) => updateProfile("lokation", value)}
-            />
-            <TextAreaField
-              label="Uddannelse"
-              value={formState.profile.uddannelse}
-              onChange={(value) => updateProfile("uddannelse", value)}
-              className="md:col-span-2"
-              rows={3}
-            />
-            <TextAreaField
-              label="Erfaring"
-              value={formState.profile.erfaring}
-              onChange={(value) => updateProfile("erfaring", value)}
-              className="md:col-span-2"
-              rows={4}
-            />
-          </div>
-        );
-      case "jobpraeferencer":
-        return (
-          <div className="grid gap-5 md:grid-cols-2">
-            <FormField
-              label="Ønsket jobtype"
-              value={formState.preferences.jobtype}
-              onChange={(value) => updatePreferences("jobtype", value)}
-            />
-            <SelectField
-              label="Fuldtid eller deltid"
-              value={formState.preferences.arbejdsform}
-              onChange={(value) => updatePreferences("arbejdsform", value)}
-              options={["Fuldtid", "Deltid", "Åben for begge"]}
-            />
-            <FormField
-              label="Lønniveau"
-              value={formState.preferences.loenniveau}
-              onChange={(value) => updatePreferences("loenniveau", value)}
-            />
-            <FormField
-              label="Transporttid"
-              value={formState.preferences.transporttid}
-              onChange={(value) => updatePreferences("transporttid", value)}
-            />
-            <FormField
-              label="Geografi"
-              value={formState.preferences.geografi}
-              onChange={(value) => updatePreferences("geografi", value)}
-            />
-            <FormField
-              label="Brancher"
-              value={formState.preferences.brancher}
-              onChange={(value) => updatePreferences("brancher", value)}
-            />
-            <TextAreaField
-              label="Hvad du ikke ønsker"
-              value={formState.preferences.undgaa}
-              onChange={(value) => updatePreferences("undgaa", value)}
-              className="md:col-span-2"
-              rows={4}
-            />
-          </div>
-        );
-      case "personlig-stil":
-        return (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="space-y-6">
-              <div className="rounded-[1.75rem] border border-cyan-100 bg-cyan-50/80 p-6">
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-950">
-                  Om personlig stil
-                </p>
-                <p className="mt-4 text-base leading-8 text-slate-700">
-                  JobPilot tilpasser tone, ordvalg og struktur til dig, så output føles naturligt og
-                  troværdigt. Det handler ikke kun om at være formel eller uformel, men om at ramme
-                  den måde, du gerne vil fremstå på over for arbejdsgivere.
-                </p>
-              </div>
-
-              <div className="grid gap-5 md:grid-cols-3">
-                <SelectField
-                  label="Formalitet"
-                  value={formState.style.formalitet}
-                  onChange={(value) => updateStyle("formalitet", value)}
-                  options={["Formel", "Balanceret formel", "Uformel"]}
-                />
-                <SelectField
-                  label="Formulering"
-                  value={formState.style.laengde}
-                  onChange={(value) => updateStyle("laengde", value)}
-                  options={["Kort og præcis", "Balanceret", "Fyldig og forklarende"]}
-                />
-                <SelectField
-                  label="Tone"
-                  value={formState.style.tone}
-                  onChange={(value) => updateStyle("tone", value)}
-                  options={["Direkte og varm", "Reflekteret", "Meget direkte"]}
-                />
-              </div>
-            </div>
-
-            <aside className="rounded-[1.75rem] border border-slate-200/80 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                AI-interview preview
-              </p>
-              <h3 className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
-                Eksempler på opfølgende spørgsmål
-              </h3>
-              <div className="mt-6 space-y-3">
-                {aiInterviewQuestions.map((question) => (
-                  <div key={question} className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm leading-7 text-slate-700">{question}</p>
-                  </div>
-                ))}
-              </div>
-            </aside>
-          </div>
-        );
-      case "opsummering":
+      case "ai-interview":
+        return renderInterviewPanel();
+      case "profiloverblik":
         return (
           <div className="space-y-6">
             <div className="rounded-[1.75rem] border border-cyan-100 bg-cyan-50/80 p-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-950">
-                Klar til næste fase
-              </p>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-950">Profiloverblik</p>
               <p className="mt-4 text-base leading-8 text-slate-700">
-                JobPilot bruger denne profil til at tilpasse CV&apos;er, ansøgninger og vurderinger af
-                jobopslag. Efter setup kommer AI med opfølgende spørgsmål, når noget kræver mere
-                præcision eller personlig nuance.
+                Her ser du dit første personlige profiludkast. Fokus er på, hvordan JobPilot forstår dig og hvad der vil styrke profilen i næste trin.
               </p>
             </div>
-
+            {renderProfileTabs()}
+          </div>
+        );
+      case "klar":
+        return (
+          <div className="space-y-6">
+            <div className="rounded-[1.75rem] border border-cyan-100 bg-cyan-50/80 p-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-950">Klar til næste fase</p>
+              <p className="mt-4 text-base leading-8 text-slate-700">
+                Dit første profiludkast er klar. Nu kan du gå videre med jobvurdering og næste konkrete handlinger.
+              </p>
+            </div>
             <div className="grid gap-5 lg:grid-cols-2">
               <SummaryCard
-                title="Basisprofil"
+                title="Status i setup"
                 items={[
-                  ["Navn", formState.profile.navn],
-                  ["Titel", formState.profile.nuvaerendeTitel],
-                  ["Lokation", formState.profile.lokation],
-                  ["Uddannelse", formState.profile.uddannelse],
-                  ["Erfaring", formState.profile.erfaring],
+                  ["Basisoplysninger", "Klar"],
+                  ["CV og dokumenter", formState.documentsSkipped ? "Mangler CV (demo: sprunget over)" : "Registreret"],
+                  ["Interview", interviewResult.status === "complete" ? "Gennemført" : "Afventer"],
+                  ["Profil", interviewResult.status === "complete" ? "Første udkast klar" : "Afventer interview"],
                 ]}
               />
               <SummaryCard
-                title="Jobpræferencer"
+                title="Næste handlinger"
                 items={[
-                  ["Jobtype", formState.preferences.jobtype],
-                  ["Arbejdsform", formState.preferences.arbejdsform],
-                  ["Lønniveau", formState.preferences.loenniveau],
-                  ["Transporttid", formState.preferences.transporttid],
-                  ["Geografi", formState.preferences.geografi],
-                  ["Brancher", formState.preferences.brancher],
-                  ["Ønsker ikke", formState.preferences.undgaa],
-                ]}
-              />
-              <SummaryCard
-                title="Personlig stil"
-                items={[
-                  ["Formalitet", formState.style.formalitet],
-                  ["Formulering", formState.style.laengde],
-                  ["Tone", formState.style.tone],
-                ]}
-              />
-              <SummaryCard
-                title="Dokumenter"
-                items={[
-                  [
-                    "Status",
-                    formState.documentsSkipped
-                      ? "Springes over foreløbigt, AI fortsætter med spørgsmål senere."
-                      : "3 mock-dokumenter klargjort som udgangspunkt for analysen.",
-                  ],
-                  ["Typer", "CV, ansættelseskontrakter og uddannelsespapirer"],
+                  ["Gå til min profil", "Se den samlede profil og senere den tekniske profil under avanceret visning."],
+                  ["Tilføj første jobopslag", "Brug et konkret opslag til at teste fit og prioritering."],
+                  ["Gå til dashboard", "Brug dashboardet som fast startpunkt i din jobsøgning."],
                 ]}
               />
             </div>
-
-            {renderInterviewPanel()}
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Gå til min profil
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Tilføj første jobopslag
+              </button>
+              <button
+                type="button"
+                className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Gå til dashboard
+              </button>
+            </div>
           </div>
         );
       default:
@@ -1050,55 +1016,43 @@ export function SetupFlow() {
     }
   }
 
+  const isProfileStepLocked = current.id === "profiloverblik" && interviewResult.status !== "complete";
+
   return (
-    <section className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="rounded-[2rem] border border-white/80 bg-white/80 p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] backdrop-blur xl:sticky xl:top-8 xl:h-fit">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Fremdrift
-            </p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              {progressValue}%
-            </p>
-          </div>
-          <div className="text-right text-sm text-slate-500">
-            <p>{currentStep + 1} af {steps.length}</p>
-            <p>{current.label}</p>
-          </div>
+    <section className="space-y-4">
+      <div className="rounded-[1.25rem] border border-white/80 bg-white/85 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">Setup-flow</p>
+          <p className="text-sm text-slate-500">{progressValue}%</p>
         </div>
-
-        <div className="mt-5 h-2 rounded-full bg-slate-200">
-          <div
-            className="h-2 rounded-full bg-slate-950 transition-all duration-300"
-            style={{ width: `${progressValue}%` }}
-          />
-        </div>
-
-        <div className="mt-6 space-y-3">
+        <div className="flex flex-wrap gap-2">
           {steps.map((step, index) => (
-            <ProgressPill
+            <button
               key={step.id}
-              active={index === currentStep}
-              completed={index < currentStep}
-              index={index}
-              label={step.label}
-            />
+              type="button"
+              onClick={() => setCurrentStep(index)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                index === currentStep
+                  ? "bg-slate-900 text-white"
+                  : index < currentStep
+                    ? "bg-cyan-100 text-cyan-900"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {step.label}
+            </button>
           ))}
         </div>
-      </aside>
+      </div>
 
       <div className="rounded-[2rem] border border-white/80 bg-white/85 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur sm:p-8 lg:p-10">
         <div className="flex flex-col gap-5 border-b border-slate-200 pb-8 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-500">
-              {current.eyebrow}
+              {current.eyebrow} • {current.label}
             </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              {current.title}
-            </h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">{current.title}</h2>
           </div>
-
           <button
             type="button"
             className="inline-flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -1114,7 +1068,7 @@ export function SetupFlow() {
             type="button"
             onClick={goBack}
             disabled={isFirstStep}
-            className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
           >
             Tilbage
           </button>
@@ -1126,14 +1080,14 @@ export function SetupFlow() {
             >
               Gem og fortsæt senere
             </button>
-            {!isLastStep || interviewResult.status === "idle" ? (
+            {!isLastStep || current.id === "ai-interview" ? (
               <button
                 type="button"
-                onClick={isLastStep ? startInterview : goNext}
-                disabled={isInterviewLoading}
-                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={current.id === "ai-interview" && interviewResult.status === "idle" ? startInterview : goNext}
+                disabled={isInterviewLoading || isProfileStepLocked}
+                className="inline-flex h-12 items-center justify-center rounded-full bg-slate-950 px-6 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
               >
-                {isLastStep
+                {current.id === "ai-interview" && interviewResult.status === "idle"
                   ? isInterviewLoading
                     ? "Starter..."
                     : "Start AI-interview"
@@ -1158,7 +1112,7 @@ function FieldWrapper({
 }) {
   return (
     <label className={className}>
-      <span className="mb-3 block text-sm font-semibold text-slate-700">{label}</span>
+      <span className="mb-2 block text-sm font-semibold text-slate-700">{label}</span>
       {children}
     </label>
   );
@@ -1180,7 +1134,7 @@ function FormField({
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+        className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
       />
     </FieldWrapper>
   );
@@ -1205,36 +1159,8 @@ function TextAreaField({
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
       />
-    </FieldWrapper>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-}) {
-  return (
-    <FieldWrapper label={label}>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
     </FieldWrapper>
   );
 }
@@ -1247,7 +1173,7 @@ function SummaryCard({
   items: [string, string][];
 }) {
   return (
-    <article className="rounded-[1.5rem] border border-slate-200/80 bg-slate-50/80 p-6">
+    <article className="rounded-[1rem] border border-slate-200/80 bg-slate-50/80 p-6">
       <h3 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h3>
       <dl className="mt-5 space-y-4">
         {items.map(([label, value]) => (
