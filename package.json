@@ -8,6 +8,7 @@
     "test:interview-scenarios": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/interview-scenarios/run-interview-scenarios.ts",
     "test:interview-manual-regression": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/interview-manual-regression/manual-regression.ts",
     "test:interview-low-clarity": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/interview-manual-regression/low-clarity-generated-regression.ts",
+    "test:setup-ux-review": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/setup-ux-review/setup-ux-review.ts",
     "start": "next start",
     "lint": "eslint"
   },
@@ -18,11 +19,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "playwright": "^1.55.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "playwright": "^1.59.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
