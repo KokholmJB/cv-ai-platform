@@ -7,6 +7,8 @@
 4. `docs/project/QUALITY_GATES.md`
 5. `docs/project/TEST_LOG.md`
 6. `docs/project/PROMPT_LIBRARY.md`
+7. `docs/project/BRUGERKONTEKST.md`
+8. `docs/project/ACCOUNT_MIGRATION.md`
 
 ## One-line product summary
 JobPilot er et AI-baseret job search operating system med interview/profil-fundament før bred automationsudvidelse.
