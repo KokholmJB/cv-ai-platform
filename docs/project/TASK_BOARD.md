@@ -2,6 +2,7 @@
 
 ## Current focus
 - Projekt-dokumentation og kontekststruktur under `docs/project/`.
+- V1-krav, profile engine-krav og future backlog er nu dokumenteret og skal reviewes før profilarkitektur genoptages.
 
 ## Next likely workstream
 - Profilarkitektur-model:

@@ -16,6 +16,7 @@
 - `npm.cmd run test:interview-scenarios`
 - `npm.cmd run test:interview-manual-regression`
 - `npm.cmd run test:interview-low-clarity`
+- Valider også engine-kvalitet mod `docs/project/PROFILE_ENGINE_REQUIREMENTS.md` før næste fase (jobevaluering, CV, ansøgning).
 
 ## Forbidden terms i user-facing setup Profiloverblik
 Undgå følgende i personlig profiltekst:
