@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { buildProfileViewModel } from "@/lib/profile/profile-view-model";
 
 type StepId = "start" | "basisoplysninger" | "dokumenter" | "ai-interview" | "profiloverblik" | "klar";
 type ProfileTabId = "overblik" | "erfaring" | "jobretning" | "arbejdsprofil" | "naeste-skridt";
@@ -686,30 +687,14 @@ export function SetupFlow() {
     }
 
     const { profileSummary, readinessAssessment, profileModel, communicationSignals } = interviewResult;
-    const effectiveCommunicationSignals = communicationSignals ?? profileModel?.communicationSignals ?? null;
-    const profileStrengths = uniqueNonEmpty(
-      profileSummary.aiProfileCore.transferableStrengths.map(toUserFacingText).filter((item) => !hasTechnicalPattern(item)),
-    );
-    const hasProfileModelSignals = Boolean(
-      (profileModel?.facts?.length ?? 0) > 0 ||
-        (profileModel?.interpretations?.length ?? 0) > 0 ||
-        (profileModel?.uncertainties?.length ?? 0) > 0 ||
-        (profileModel?.hypotheses?.length ?? 0) > 0,
-    );
-
-    const displayProfile = buildUserFacingSetupProfile({
-      name: formState.profile.navn,
-      currentRole: formatMaybeValue(profileSummary.userProfileData.currentRole),
-      yearsExperience: formatMaybeValue(profileSummary.userProfileData.yearsExperience),
-      targetDirection: formatMaybeValue(profileSummary.userProfileData.targetDirection),
-      workStyleFit: toUserFacingText(formatMaybeText(profileSummary.aiProfileCore.workStyleFit)),
-      directionOfChange: toUserFacingText(formatMaybeText(profileSummary.aiProfileCore.directionOfChange)),
-      strengths: profileStrengths,
-      communicationSignals: effectiveCommunicationSignals,
-      readinessLevel: readinessAssessment.level,
-      hasProfileModelSignals,
+    const profileViewModel = buildProfileViewModel({
+      profileSummary,
+      readinessAssessment,
+      profileModel,
+      communicationSignals,
       userAvoids: formState.preferences.undgaa,
     });
+    const displayProfile = profileViewModel.personal;
 
     const tabContent: Record<ProfileTabId, React.ReactNode> = {
       overblik: (
@@ -726,17 +711,17 @@ export function SetupFlow() {
             <SummaryCard
               title="Kort fortalt"
               items={[
-                ["Sådan forstår JobPilot dig", displayProfile.overblik.kortFortalt],
-                ["Det JobPilot især ser", displayProfile.overblik.hvadJobpilotSer],
-                ["Sådan kan profilen bruges", displayProfile.overblik.saadanBrugesProfilen],
+                ["Sådan forstår JobPilot dig", displayProfile.overview.shortSummary],
+                ["Det JobPilot især ser", displayProfile.overview.signalSummary],
+                ["Sådan kan profilen bruges", displayProfile.overview.practicalUse],
               ]}
             />
             <SummaryCard
               title="Det du kommer med"
               items={[
-                ["Nuværende rolle", formatMaybeValue(profileSummary.userProfileData.currentRole)],
-                ["Erfaring", formatMaybeValue(profileSummary.userProfileData.yearsExperience)],
-                ["Retning lige nu", formatMaybeValue(profileSummary.userProfileData.targetDirection)],
+                ["Nuværende rolle", displayProfile.basicInfo.currentRole],
+                ["Erfaring", displayProfile.basicInfo.yearsExperience],
+                ["Retning lige nu", displayProfile.basicInfo.targetDirection],
               ]}
             />
           </div>
@@ -747,9 +732,9 @@ export function SetupFlow() {
           <SummaryCard
             title="Din erfaring i praksis"
             items={[
-              ["Din erfaring", displayProfile.erfaring.erfaringstekst],
-              ["Det din erfaring peger på", displayProfile.erfaring.vaerdibidrag],
-              ["Hvis du vil gøre profilen skarpere", displayProfile.erfaring.senereEksempler],
+              ["Din erfaring", displayProfile.experience.experienceText],
+              ["Det din erfaring peger på", displayProfile.experience.valueText],
+              ["Hvis du vil gøre profilen skarpere", displayProfile.experience.optionalRefinement],
             ]}
           />
           <SummaryCard
@@ -767,9 +752,9 @@ export function SetupFlow() {
           <SummaryCard
             title="Din retning lige nu"
             items={[
-              ["Retning", displayProfile.jobretning.retningLigeNu],
-              ["Som pejlemærke", displayProfile.jobretning.pejlemaerke],
-              ["Hvis du vil afklare mere", displayProfile.jobretning.naesteAfklaring],
+              ["Retning", displayProfile.jobDirection.directionNow],
+              ["Som pejlemærke", displayProfile.jobDirection.markerText],
+              ["Hvis du vil afklare mere", displayProfile.jobDirection.optionalClarification],
             ]}
           />
           <SummaryCard
@@ -787,15 +772,15 @@ export function SetupFlow() {
           <SummaryCard
             title="Rammer der passer godt"
             items={[
-              ["Kort fortalt", displayProfile.arbejdsprofil.rammerPasserGodt],
-              ["Din arbejdsstil", displayProfile.arbejdsprofil.arbejdsstil],
+              ["Kort fortalt", displayProfile.workProfile.goodFit],
+              ["Din arbejdsstil", displayProfile.workProfile.styleText],
               ["Ansvar og tempo", "JobPilot ser tegn på, at du trives bedst, når ansvar, forventninger og samarbejde er tydeligt afstemt."],
             ]}
           />
           <SummaryCard
             title="Rammer der passer mindre godt"
             items={[
-              ["Miljø og samarbejde", displayProfile.arbejdsprofil.rammerPasserMindreGodt],
+              ["Miljø og samarbejde", displayProfile.workProfile.lessFit],
               ["Kommunikation", "Det tyder på, at du foretrækker klar kommunikation og tydelige prioriteringer."],
               ["I praksis", "Roller med varigt uklare mål eller uforudsigelige rammer kan være mindre attraktive for dig."],
             ]}
@@ -805,7 +790,7 @@ export function SetupFlow() {
       "naeste-skridt": (
         <SummaryCard
           title="Næste bedste skridt"
-          items={displayProfile.naesteSkridt.handlinger}
+          items={displayProfile.nextSteps.actions}
         />
       ),
     };

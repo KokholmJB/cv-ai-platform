@@ -1844,6 +1844,10 @@ function shouldCompleteInsteadOfContinuing({
     return false;
   }
 
+  if (!hasTransitionCompletionSubstance({ profileDraft, interviewState, profileModel })) {
+    return false;
+  }
+
   const visibleProgress = estimateVisibleInterviewProgress(interviewState);
   const questionFamily = inferQuestionFamily(question, focusArea);
   const evidenceTrack = inferEvidenceTrackFromQuestion(question);
@@ -2453,12 +2457,14 @@ function buildGuidedRecoveryQuestionForVagueAnswer(focusArea: FocusArea | null) 
 }
 
 function isProfileSummarySufficientForPhase1({
+  profileDraft,
   profileSummary,
   lastAssistantQuestion,
   lastUserAnswer,
   interviewState,
   profileModel,
 }: {
+  profileDraft: ProfileDraft;
   profileSummary: ProfileSummary;
   lastAssistantQuestion: string | null;
   lastUserAnswer: string | null;
@@ -2565,6 +2571,15 @@ function isProfileSummarySufficientForPhase1({
   }
 
   if (profileModel && countHighImpactUnresolvedUncertainties(profileModel) >= 3 && interviewState.answeredTurns < 9) {
+    return false;
+  }
+
+  const isTransitionContext = isTransitionDirectionFromContext({ profileDraft, interviewState });
+  if (isTransitionContext) {
+    if (!profileModel || !hasTransitionCompletionSubstance({ profileDraft, interviewState, profileModel })) {
+      return false;
+    }
+  } else if (profileModel && !hasTransitionCompletionSubstance({ profileDraft, interviewState, profileModel })) {
     return false;
   }
 
@@ -3493,6 +3508,124 @@ function countHighImpactUnresolvedUncertainties(profileModel: InterviewProfileMo
   return profileModel.uncertainties.filter((item) => item.unresolved && item.impact === "high").length;
 }
 
+function isTransitionDirectionFromContext({
+  profileDraft,
+  interviewState,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+}): boolean {
+  const targetKind = inferTargetProfileKind(profileDraft);
+  if (targetKind === "direction_change" || targetKind === "product_transition") {
+    return true;
+  }
+  return !!interviewState.coverage.directionOfChange;
+}
+
+function isTransitionDirectionForCompletionGate({
+  profileDraft,
+  interviewState,
+  profileModel,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileModel: InterviewProfileModel;
+}) {
+  const targetKind = inferTargetProfileKind(profileDraft);
+  if (targetKind === "direction_change" || targetKind === "product_transition") {
+    return true;
+  }
+
+  if (!interviewState.coverage.directionOfChange) {
+    return false;
+  }
+
+  return profileModel.hypotheses.some((hypothesis) =>
+    [
+      "direction_change_transfer_basis",
+      "adjacent_bridge_role_may_be_best_next_step",
+      "product_adjacent_transition_stronger_than_full_pm",
+      "product_adjacent_transition",
+    ].includes(hypothesis.key),
+  );
+}
+
+function hasConcreteProductAdjacentOwnershipEvidence(profileModel: InterviewProfileModel, interviewState: InterviewState) {
+  if (interviewState.evidenceCounts.productOwnershipEvidenceCount >= 1) {
+    return true;
+  }
+
+  const ownershipTerms = [
+    "roadmap",
+    "backlog",
+    "prioritering",
+    "prioriteringsret",
+    "produktbeslut",
+    "beslutningsret",
+    "beslutningsautoritet",
+    "produktansvar",
+  ];
+
+  return profileModel.facts.some((fact) => {
+    const normalized = normalizeText(fact.statement);
+    return ownershipTerms.some((term) => normalized.includes(term));
+  });
+}
+
+function hasExplicitTransitionRealismAssessment(profileModel: InterviewProfileModel) {
+  const realismKeys = new Set([
+    "adjacent_bridge_role_may_be_best_next_step",
+    "bridge_step_for_transition_distance",
+    "product_adjacent_transition_stronger_than_full_pm",
+    "product_adjacent_transition",
+  ]);
+
+  if (profileModel.hypotheses.some((hypothesis) => realismKeys.has(hypothesis.key))) {
+    return true;
+  }
+
+  return profileModel.uncertainties.some((uncertainty) => realismKeys.has(uncertainty.key));
+}
+
+function hasBridgeEvidenceSignalWithConfidence(profileModel: InterviewProfileModel) {
+  const bridgeHypothesis = profileModel.hypotheses.find(
+    (hypothesis) =>
+      hypothesis.key === "adjacent_bridge_role_may_be_best_next_step" ||
+      hypothesis.key === "product_adjacent_transition_stronger_than_full_pm",
+  );
+
+  if (bridgeHypothesis && bridgeHypothesis.confidence !== "low") {
+    return true;
+  }
+
+  return profileModel.uncertainties.some(
+    (uncertainty) =>
+      uncertainty.key === "bridge_step_for_transition_distance" ||
+      uncertainty.key === "formal_product_ownership" ||
+      uncertainty.key === "strategic_direction_ownership",
+  );
+}
+
+function hasTransitionCompletionSubstance({
+  profileDraft,
+  interviewState,
+  profileModel,
+}: {
+  profileDraft: ProfileDraft;
+  interviewState: InterviewState;
+  profileModel: InterviewProfileModel;
+}) {
+  if (!isTransitionDirectionForCompletionGate({ profileDraft, interviewState, profileModel })) {
+    return true;
+  }
+
+  return (
+    hasConcreteProductAdjacentOwnershipEvidence(profileModel, interviewState) ||
+    hasExplicitTransitionRealismAssessment(profileModel) ||
+    hasBridgeEvidenceSignalWithConfidence(profileModel)
+  );
+}
+
 function buildComplexGapRecoveryQuestion({
   profileDraft,
   interviewState,
@@ -4158,6 +4291,7 @@ export async function POST(request: Request) {
 
         if (
           !isProfileSummarySufficientForPhase1({
+            profileDraft,
             profileSummary: normalizedProfileSummary,
             lastAssistantQuestion: typeof lastAssistantQuestion === "string" ? lastAssistantQuestion.trim() : null,
             lastUserAnswer: typeof lastUserAnswer === "string" ? lastUserAnswer.trim() : null,
