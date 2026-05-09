@@ -1,47 +1,30 @@
 # CURRENT_STATE
-
 ## Produkt
 JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
-
 ## Aktuel baseline
-- Safe baseline: `main`
-- Branch i denne opgave: `feature/project-docs`
-
-## Bygget status (kendt)
-- Ruter:
-  - `/setup`
-  - `/profile` (tidlig shell)
-- Setup-flow:
-  - `Start -> Basisoplysninger -> Dokumenter -> AI-interview -> Profiloverblik -> Klar`
-- Setup Profiloverblik er gjort brugerrettet og undgår rå teknisk AI-tekst.
-
+- Safe baseline: main
+- Working tree: clean
+- Seneste commit: profile view model arkitektur + transition completion gate
+## Bygget status (known)
+- Ruter: /setup og /profile (tidlig shell)
+- Setup-flow: Start → Basisoplysninger → Dokumenter → AI-interview → Profiloverblik → Klar
+- profile-view-model.ts oprettet og aktiv
+- buildProfileViewModel bruges i setup-flow og profile/page.tsx
 ## Senest kendte teststatus
-- `npm.cmd run build`: pass (på main)
-- `npm.cmd run test:setup-ux-review`: pass (på main)
-  - `interview completed=true`
-  - `screenshots=11`
-  - `tabs audited=5`
-  - `tabs not reached=0`
-  - `findings=0 WARN, 0 FAIL`
-
+- npm.cmd run build: pass
+- npm.cmd run test:setup-ux-review: pass (0 WARN / 0 FAIL)
+- npm.cmd run test:interview-scenarios: 9 PASS / 1 WARN / 0 FAIL
+- WARN: project-manager-to-product-manager earlyCompletionWarning — accepteret som known limitation
 ## Næste workstream
-- Profilarkitektur:
-  - personlig profil (user-facing)
-  - teknisk AI-profil (intern/advanced)
-  - mapping-lag mellem dem
-
+- Interviewmotor udvidelse til fem profildimensioner (PROFILE_ENGINE_REQUIREMENTS.md V2)
+- Analyse-lag til dyb profilering
 ## Kendte begrænsninger
-- `/profile` er stadig tidlig og uden persistence.
-- Ingen auth/database/payment/persistence endnu.
-- Ingen marketplace/business-model lag endnu.
-- Tidligere WIP profilarkitektur ligger i stash (ikke på denne branch).
-
-## Standardkommandoer før/efter arbejde
-- Før:
-  - `git status --short`
-  - `git branch --show-current`
-- Efter:
-  - `npm.cmd run build`
-  - `npm.cmd run lint`
-  - `git diff --check`
-  - Ved setup/profile-arbejde: `npm.cmd run test:setup-ux-review`
+- /profile er stadig tidlig og uden persistence
+- Ingen auth/database/payment/persistence endnu
+- Document/evidence intake ikke implementeret
+- Dyb profilering (dimension 1, 3, 4, 5) ikke implementeret i motor endnu
+## Projektdokumentation committed på main
+- PROFILE_ENGINE_REQUIREMENTS.md (V2)
+- DEEP_PROFILE_REQUIREMENTS.md
+- JOB_EVALUATION_REQUIREMENTS.md
+- V1 projektplan defineret med 7 milepæle over 8 uger

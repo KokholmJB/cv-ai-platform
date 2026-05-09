@@ -1,29 +1,33 @@
 # TASK_BOARD
-
 ## Current focus
-- Projekt-dokumentation og kontekststruktur under `docs/project/`.
-- V1-krav, profile engine-krav og future backlog er nu dokumenteret og skal reviewes før profilarkitektur genoptages.
-
-## Next likely workstream
-- Profilarkitektur-model:
-  - adskilt personal vs technical view model
-  - genbrug mellem `/setup` og `/profile`
-  - kontrolleret mapping-lag
-
+Interviewmotor udvidelse til fem profildimensioner + analyse-lag til dyb profilering.
+Krav defineret i PROFILE_ENGINE_REQUIREMENTS.md V2.
+## Næste workstream
+1. Gap-analyse: hvad mangler motoren konkret for dimension 1, 3, 4 og 5
+2. Nye spørgsmålsstrategier til motoren
+3. Analyse-lag til dyb profil-output
+4. Quality gates for de fem dimensioner
 ## Recently completed
-- Setup Profiloverblik forbedret til brugerrettet visning.
-- Setup UX review script etableret og grønt på main:
-  - `test:setup-ux-review` med `0 WARN / 0 FAIL`.
-
+- Kontomigration gennemført og verificeret
+- Transition completion gate implementeret og testet
+- stash@{0} applied rent — profile view model arkitektur på plads
+- buildProfileViewModel aktiv i setup-flow og profile/page.tsx
+- PROFILE_ENGINE_REQUIREMENTS.md opdateret til V2 med fem dimensioner
+- DEEP_PROFILE_REQUIREMENTS.md committed
+- JOB_EVALUATION_REQUIREMENTS.md committed
+- V1 projektplan defineret (7 milepæle, 8 uger)
+- Cowork sat op med adgang til docs/project/
+## Known limitations
+- project-manager-to-product-manager WARN (earlyCompletionWarning) — accepteret, løses senere
 ## Parked / later
 - Persistence/database
-- Payment
+- Payment/abonnement
 - CV generation (fuld pipeline)
 - Application generation
+- Jobtracker
 - Marketplace/business model
-- Interview training/ops pipeline
-
-## Active risks
-- Kontekttab mellem chats/sessions.
-- Blandede workstreams i samme pass.
-- Profilarkitektur stadig ikke fuldt separeret i alle views.
+- Document/evidence intake
+- Interview training
+## Aktive risici
+- Motorudvidelse er kompleks — kræver præcis scope før Codex-prompts
+- Kontekttab mellem sessions — brug Cowork til filsynkronisering fremover
