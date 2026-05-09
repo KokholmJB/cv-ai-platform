@@ -16,3 +16,9 @@
 ## Leveranceprioritet
 8. Undgå at bygge database/payment/persistence/marketplace for tidligt.
 9. Fokusér på sikker, iterativ produktkerne før platform-udvidelser.
+
+## Profilarkitektur V2 (godkendt 2026-05-09)
+10. Interviewmotoren udvides til fem profildimensioner som defineret i PROFILE_ENGINE_REQUIREMENTS.md V2.
+11. De fem dimensioner er: faglig profil, personprofil og adfærdsmønster, kommunikationsprofil, livsstil og arbejdsliv-balance, rekrutteringsflexibilitet.
+12. Tre ekstra kapaciteter tilføjes: styrkeblinde pletter, energikort over arbejdslivet, troværdighedsvurdering.
+13. Dette er V1-scope — ikke future backlog.
