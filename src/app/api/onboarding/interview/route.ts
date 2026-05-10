@@ -208,12 +208,25 @@ type CredibilitySignalsAnalysis = {
   claimsWithoutSupportingEvidence: string[];
 };
 
+type RecruitmentLogicType =
+  | "chemistry_and_fit"
+  | "cv_and_experience"
+  | "documented_results"
+  | "personality_and_culture"
+  | "academic_and_structured";
+
+type RecruitmentLogicAnalysis = {
+  type: RecruitmentLogicType;
+  confidence: "high" | "medium" | "low";
+};
+
 type CompletionAnalysis = {
   communicationStyle: CommunicationStyleAnalysis;
   recruitmentFit: RecruitmentFitAnalysis;
   strengthGaps: StrengthGapsAnalysis;
   energyMap: EnergyMapAnalysis;
   credibilitySignals: CredibilitySignalsAnalysis;
+  recruitmentLogic: RecruitmentLogicAnalysis;
 };
 
 type InterviewProfileModel = {
@@ -2089,12 +2102,76 @@ function buildCompletionAnalysis({
   const consistency: CredibilitySignalsAnalysis["consistency"] =
     contradicting.length === 0 ? "high" : contradicting.length === 1 ? "medium" : "low";
 
+  // recruitmentLogic
+  const targetNorm = normalizeText(profileDraft.targetDirection ?? "");
+  const roleNorm = normalizeText(profileDraft.currentRole ?? "");
+  const rlScores: Record<RecruitmentLogicType, number> = {
+    documented_results: 0,
+    cv_and_experience: 0,
+    academic_and_structured: 0,
+    personality_and_culture: 0,
+    chemistry_and_fit: 0,
+  };
+
+  // documented_results
+  if (targetKind === "next_level") rlScores.documented_results += 3;
+  if (interviewState.evidenceCounts.resultEvidenceCount >= 2) rlScores.documented_results += 2;
+  if (
+    ["leder", "ledelse", "head of", "director", "chef", "manager", "teamleder", "afdelingsleder"].some(
+      (k) => targetNorm.includes(k) || roleNorm.includes(k),
+    )
+  )
+    rlScores.documented_results += 2;
+  if (profileModel.hypotheses.some((h) => h.key === "leadership_vs_coordination_scope" || h.key === "result_strength"))
+    rlScores.documented_results += 1;
+
+  // cv_and_experience
+  if (targetKind === "same_track" || targetKind === "same_track_better_conditions") rlScores.cv_and_experience += 3;
+  if (interviewState.evidenceCounts.concreteEvidenceCount >= 2) rlScores.cv_and_experience += 1;
+  if (targetKind === "direction_change" || targetKind === "product_transition") rlScores.cv_and_experience += 1;
+
+  // academic_and_structured
+  if (targetKind === "specialist_track") rlScores.academic_and_structured += 3;
+  if (
+    ["specialist", "ekspert", "analyse", "data", "forskning", "konsulent", "ingeniør", "arkitekt", "revisor", "jurist"].some(
+      (k) => targetNorm.includes(k) || roleNorm.includes(k),
+    )
+  )
+    rlScores.academic_and_structured += 2;
+
+  // personality_and_culture
+  if (
+    ["salg", "service", "hr", "personale", "rådgivning", "relationer", "kunde", "klient", "support"].some(
+      (k) => targetNorm.includes(k) || roleNorm.includes(k),
+    )
+  )
+    rlScores.personality_and_culture += 3;
+  if (interviewState.evidenceCounts.noGoClarityCount >= 1) rlScores.personality_and_culture += 1;
+
+  // chemistry_and_fit
+  if (
+    ["kultur", "startup", "kreativ", "atmosfære", "trivsel", "miljø", "stemning"].some(
+      (k) => targetNorm.includes(k) || roleNorm.includes(k),
+    )
+  )
+    rlScores.chemistry_and_fit += 3;
+  if (targetKind === "same_track_better_conditions" && rlScores.documented_results === 0)
+    rlScores.chemistry_and_fit += 1;
+
+  const rlSorted = (Object.entries(rlScores) as [RecruitmentLogicType, number][]).sort((a, b) => b[1] - a[1]);
+  const rlType = rlSorted[0][0];
+  const rlTop = rlSorted[0][1];
+  const rlSecond = rlSorted[1][1];
+  const rlConfidence: RecruitmentLogicAnalysis["confidence"] =
+    rlTop >= 4 && rlTop - rlSecond >= 2 ? "high" : rlTop >= 2 ? "medium" : "low";
+
   return {
     communicationStyle: { answerLength, abstractionLevel, selfReferences, tone },
     recruitmentFit: { communicationStyleMatchToRecruitmentExpectations, likelyUnderseller },
     strengthGaps: { explicitlyMentionedStrengths, implicitStrengthsFromExamples, discrepancyConfidence },
     energyMap: { energizers, drainers },
     credibilitySignals: { consistency, identifiedContradictions, claimsWithoutSupportingEvidence },
+    recruitmentLogic: { type: rlType, confidence: rlConfidence },
   };
 }
 
