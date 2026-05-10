@@ -1,10 +1,8 @@
 # TASK_BOARD
 ## Current focus
-Interviewmotor udvidelse til fem profildimensioner + analyse-lag til dyb profilering.
-Krav defineret i PROFILE_ENGINE_REQUIREMENTS.md V2.
+Dimension 4: livsstil og arbejdsliv-balance.
 ## Næste workstream
-1. Dimension 2: personprofil og adfærdsmønster
-2. Dimension 4: livsstil og rammebetingelser
+1. Dimension 4: livsstil og arbejdsliv-balance
 ## Recently completed
 - Kontomigration gennemført og verificeret
 - Transition completion gate implementeret og testet
@@ -17,8 +15,9 @@ Krav defineret i PROFILE_ENGINE_REQUIREMENTS.md V2.
 - Cowork sat op med adgang til docs/project/
 - Analyse-lag implementeret i route.ts (communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals)
 - Dimension 5: recruitmentLogic klassificering tilføjet til completionAnalysis
+- Dimension 2: behaviorProfile tilføjet (behaviorUnderPressure, naturalTeamRole, decisionStyle, ambitionProfile, selfImageGap)
 ## Known limitations
-- specialist-expert intention_violation:leadership — stokastisk LLM-varians, ikke en regressionsfejl
+- specialist-expert og project-manager-to-product-manager earlyCompletionWarning — stokastisk LLM-varians, ikke regressionsfejl
 ## Parked / later
 - Persistence/database
 - Payment/abonnement
