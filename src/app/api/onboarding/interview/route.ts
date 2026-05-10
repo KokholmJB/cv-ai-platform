@@ -228,6 +228,16 @@ type BehaviorProfileAnalysis = {
   selfImageGap: { likelySeverity: "low" | "medium" | "high"; signals: string[] };
 };
 
+type LifestyleProfileAnalysis = {
+  workIntensityPreference: "high" | "moderate" | "steady" | "unclear";
+  flexibilityNeeds: {
+    workLocation: "remote" | "hybrid" | "onsite" | "unclear";
+    scheduleFlexibility: "high" | "moderate" | "low" | "unclear";
+  };
+  lifestyleFit: "good_fit" | "potential_mismatch" | "unclear";
+  sustainabilityRisk: "low" | "medium" | "high";
+};
+
 type CompletionAnalysis = {
   communicationStyle: CommunicationStyleAnalysis;
   recruitmentFit: RecruitmentFitAnalysis;
@@ -236,6 +246,7 @@ type CompletionAnalysis = {
   credibilitySignals: CredibilitySignalsAnalysis;
   recruitmentLogic: RecruitmentLogicAnalysis;
   behaviorProfile: BehaviorProfileAnalysis;
+  lifestyleProfile: LifestyleProfileAnalysis;
 };
 
 type InterviewProfileModel = {
@@ -2256,6 +2267,72 @@ function buildCompletionAnalysis({
   const selfImageGapSeverity: "low" | "medium" | "high" =
     selfImageGapSignals.length >= 3 ? "high" : selfImageGapSignals.length >= 1 ? "medium" : "low";
 
+  // lifestyleProfile (dimension 4)
+  const experienceNorm = normalizeText(profileDraft.yearsExperience ?? "");
+  const combinedNorm = [targetNorm, roleNorm, experienceNorm].join(" ");
+
+  const workIntensityPreference: LifestyleProfileAnalysis["workIntensityPreference"] =
+    targetKind === "next_level" ||
+    ["intenst", "hoj fart", "ambitiost", "travlt"].some((k) => combinedNorm.includes(k))
+      ? "high"
+      : targetKind === "less_responsibility" ||
+          targetKind === "same_track" ||
+          targetKind === "same_track_better_conditions" ||
+          ["ro ", "balance", "stabil", "trygt", "mindre pres", "lavere pres"].some((k) => combinedNorm.includes(k))
+        ? "steady"
+        : targetKind === "direction_change" ||
+            targetKind === "product_transition" ||
+            targetKind === "specialist_track"
+          ? "moderate"
+          : "unclear";
+
+  const workLocation: LifestyleProfileAnalysis["flexibilityNeeds"]["workLocation"] = ["remote", "hjemmefra",
+    "hjemmearbejde"].some((k) => combinedNorm.includes(k))
+    ? "remote"
+    : ["hybrid", "delvist hjemme", "blandet"].some((k) => combinedNorm.includes(k))
+      ? "hybrid"
+      : ["kontor", "fysisk tilstedevarelse", "pa stedet"].some((k) => combinedNorm.includes(k))
+        ? "onsite"
+        : "unclear";
+
+  const scheduleFlexibility: LifestyleProfileAnalysis["flexibilityNeeds"]["scheduleFlexibility"] = [
+    "fleksibel",
+    "fleksibelt",
+    "fleks",
+    "egne timer",
+    "selvtilrettelaggelse",
+  ].some((k) => combinedNorm.includes(k))
+    ? "high"
+    : ["vagtplan", "skifteholdsarbejde", "faste timer", "skemalagt"].some((k) => combinedNorm.includes(k))
+      ? "low"
+      : interviewState.coverage.workStyleFit || interviewState.coverage.noGoClarity
+        ? "moderate"
+        : "unclear";
+
+  const lifestyleFit: LifestyleProfileAnalysis["lifestyleFit"] =
+    targetKind === "same_track" ||
+    targetKind === "same_track_better_conditions" ||
+    targetKind === "less_responsibility"
+      ? "good_fit"
+      : (targetKind === "next_level" && interviewState.evidenceCounts.noGoClarityCount >= 1) ||
+          drainers.length >= 2
+        ? "potential_mismatch"
+        : "unclear";
+
+  const sustainabilityRiskScore =
+    (targetKind === "next_level" ? 1 : 0) +
+    (drainers.length >= 2 ? 1 : 0) +
+    (signals.possibleSelfMinimizingLanguage ? 1 : 0) +
+    (contradicting.length >= 1 ? 1 : 0);
+  const sustainabilityRisk: LifestyleProfileAnalysis["sustainabilityRisk"] =
+    targetKind === "less_responsibility" || targetKind === "same_track"
+      ? "low"
+      : sustainabilityRiskScore >= 3
+        ? "high"
+        : sustainabilityRiskScore >= 1
+          ? "medium"
+          : "low";
+
   return {
     communicationStyle: { answerLength, abstractionLevel, selfReferences, tone },
     recruitmentFit: { communicationStyleMatchToRecruitmentExpectations, likelyUnderseller },
@@ -2269,6 +2346,12 @@ function buildCompletionAnalysis({
       decisionStyle,
       ambitionProfile,
       selfImageGap: { likelySeverity: selfImageGapSeverity, signals: selfImageGapSignals },
+    },
+    lifestyleProfile: {
+      workIntensityPreference,
+      flexibilityNeeds: { workLocation, scheduleFlexibility },
+      lifestyleFit,
+      sustainabilityRisk,
     },
   };
 }
