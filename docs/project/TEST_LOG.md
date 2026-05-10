@@ -1,8 +1,9 @@
 # TEST_LOG
 
 ## Latest confirmed state (known)
-- `npm.cmd run build`: pass (main baseline)
-- `npm.cmd run test:setup-ux-review`: pass (main baseline)
+- `npm.cmd run build`: pass (commit 0339065)
+- `npm.cmd run test:interview-scenarios`: 10 PASS / 0 WARN / 0 FAIL (commit 0339065)
+- `npm.cmd run test:setup-ux-review`: pass (main baseline — ikke re-kørt efter motor-ændringer)
   - `interview completed=true`
   - `screenshots=11`
   - `tabs audited=5`

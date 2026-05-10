@@ -3,10 +3,8 @@
 Interviewmotor udvidelse til fem profildimensioner + analyse-lag til dyb profilering.
 Krav defineret i PROFILE_ENGINE_REQUIREMENTS.md V2.
 ## Næste workstream
-1. Gap-analyse: hvad mangler motoren konkret for dimension 1, 3, 4 og 5
-2. Nye spørgsmålsstrategier til motoren
-3. Analyse-lag til dyb profil-output
-4. Quality gates for de fem dimensioner
+1. Dimension 2: personprofil og adfærdsmønster
+2. Dimension 4: livsstil og rammebetingelser
 ## Recently completed
 - Kontomigration gennemført og verificeret
 - Transition completion gate implementeret og testet
@@ -17,8 +15,10 @@ Krav defineret i PROFILE_ENGINE_REQUIREMENTS.md V2.
 - JOB_EVALUATION_REQUIREMENTS.md committed
 - V1 projektplan defineret (7 milepæle, 8 uger)
 - Cowork sat op med adgang til docs/project/
+- Analyse-lag implementeret i route.ts (communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals)
+- Dimension 5: recruitmentLogic klassificering tilføjet til completionAnalysis
 ## Known limitations
-- project-manager-to-product-manager WARN (earlyCompletionWarning) — accepteret, løses senere
+- specialist-expert intention_violation:leadership — stokastisk LLM-varians, ikke en regressionsfejl
 ## Parked / later
 - Persistence/database
 - Payment/abonnement
