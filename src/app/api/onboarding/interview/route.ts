@@ -220,6 +220,14 @@ type RecruitmentLogicAnalysis = {
   confidence: "high" | "medium" | "low";
 };
 
+type BehaviorProfileAnalysis = {
+  behaviorUnderPressure: "problem_solver" | "withdraws" | "seeks_support" | "takes_control" | "unclear";
+  naturalTeamRole: "initiator" | "executor" | "coordinator" | "specialist" | "unclear";
+  decisionStyle: "analytical" | "intuitive" | "consensus_seeking" | "action_oriented";
+  ambitionProfile: "upward" | "lateral" | "less_responsibility" | "better_conditions" | "unclear";
+  selfImageGap: { likelySeverity: "low" | "medium" | "high"; signals: string[] };
+};
+
 type CompletionAnalysis = {
   communicationStyle: CommunicationStyleAnalysis;
   recruitmentFit: RecruitmentFitAnalysis;
@@ -227,6 +235,7 @@ type CompletionAnalysis = {
   energyMap: EnergyMapAnalysis;
   credibilitySignals: CredibilitySignalsAnalysis;
   recruitmentLogic: RecruitmentLogicAnalysis;
+  behaviorProfile: BehaviorProfileAnalysis;
 };
 
 type InterviewProfileModel = {
@@ -2165,6 +2174,88 @@ function buildCompletionAnalysis({
   const rlConfidence: RecruitmentLogicAnalysis["confidence"] =
     rlTop >= 4 && rlTop - rlSecond >= 2 ? "high" : rlTop >= 2 ? "medium" : "low";
 
+  // behaviorProfile (dimension 2)
+  type BUP = BehaviorProfileAnalysis["behaviorUnderPressure"];
+  const bupScores: Record<Exclude<BUP, "unclear">, number> = {
+    takes_control: 0,
+    problem_solver: 0,
+    seeks_support: 0,
+    withdraws: 0,
+  };
+  if (targetKind === "next_level") bupScores.takes_control += 3;
+  if (interviewState.evidenceCounts.ownershipScopeCount >= 2 && interviewState.evidenceCounts.resultEvidenceCount >= 2)
+    bupScores.takes_control += 2;
+  if (["leder", "chef", "head of", "ansvarlig"].some((k) => roleNorm.includes(k))) bupScores.takes_control += 1;
+  if (targetKind === "specialist_track") bupScores.problem_solver += 2;
+  if (signals.structureLevel === "high" && signals.evidenceDensity !== "low") bupScores.problem_solver += 2;
+  if (interviewState.evidenceCounts.concreteEvidenceCount >= 2) bupScores.problem_solver += 1;
+  if (signals.possibleSelfMinimizingLanguage) bupScores.seeks_support += 3;
+  if (selfReferences === "distancing_we") bupScores.seeks_support += 1;
+  if (interviewState.evidenceCounts.noGoClarityCount >= 1 && bupScores.takes_control === 0) bupScores.withdraws += 2;
+  if (targetKind === "less_responsibility") bupScores.withdraws += 1;
+  const bupSorted = (Object.entries(bupScores) as [Exclude<BUP, "unclear">, number][]).sort((a, b) => b[1] - a[1]);
+  const behaviorUnderPressure: BUP = bupSorted[0][1] >= 2 ? bupSorted[0][0] : "unclear";
+
+  type NTR = BehaviorProfileAnalysis["naturalTeamRole"];
+  const ntrScores: Record<Exclude<NTR, "unclear">, number> = {
+    initiator: 0,
+    executor: 0,
+    coordinator: 0,
+    specialist: 0,
+  };
+  if (targetKind === "next_level") ntrScores.initiator += 3;
+  if (interviewState.evidenceCounts.ownershipScopeCount >= 2) ntrScores.initiator += 1;
+  if (profileModel.interpretations.some((i) => i.key === "execution_and_coordination_strength"))
+    ntrScores.coordinator += 3;
+  if (targetKind === "product_transition" || targetKind === "direction_change") ntrScores.coordinator += 1;
+  if (targetKind === "same_track" || targetKind === "same_track_better_conditions") ntrScores.executor += 2;
+  if (interviewState.evidenceCounts.resultEvidenceCount >= 2) ntrScores.executor += 1;
+  if (targetKind === "specialist_track") ntrScores.specialist += 3;
+  const ntrSorted = (Object.entries(ntrScores) as [Exclude<NTR, "unclear">, number][]).sort((a, b) => b[1] - a[1]);
+  const naturalTeamRole: NTR = ntrSorted[0][1] >= 2 ? ntrSorted[0][0] : "unclear";
+
+  type DS = BehaviorProfileAnalysis["decisionStyle"];
+  const dsScores: Record<DS, number> = { analytical: 0, intuitive: 0, consensus_seeking: 0, action_oriented: 0 };
+  if (signals.structureLevel === "high") dsScores.analytical += 2;
+  if (signals.evidenceDensity === "high") dsScores.analytical += 1;
+  if (targetKind === "specialist_track") dsScores.analytical += 1;
+  if (interviewState.evidenceCounts.resultEvidenceCount >= 2 && interviewState.evidenceCounts.ownershipScopeCount >= 1)
+    dsScores.action_oriented += 2;
+  if (targetKind === "next_level") dsScores.action_oriented += 1;
+  if (signals.answerStyle === "concise") dsScores.action_oriented += 1;
+  if (selfReferences === "distancing_we") dsScores.consensus_seeking += 2;
+  if (targetKind === "product_transition") dsScores.consensus_seeking += 1;
+  if (interviewState.coverage.workStyleFit && interviewState.coverage.motivationFit) dsScores.consensus_seeking += 1;
+  if (tone === "exploratory") dsScores.intuitive += 2;
+  if (targetKind === "unclear") dsScores.intuitive += 1;
+  if (signals.structureLevel === "low") dsScores.intuitive += 1;
+  const dsSorted = (Object.entries(dsScores) as [DS, number][]).sort((a, b) => b[1] - a[1]);
+  const decisionStyle: DS = dsSorted[0][0];
+
+  const ambitionProfile: BehaviorProfileAnalysis["ambitionProfile"] =
+    targetKind === "next_level"
+      ? "upward"
+      : targetKind === "direction_change" || targetKind === "product_transition" || targetKind === "specialist_track"
+        ? "lateral"
+        : targetKind === "less_responsibility"
+          ? "less_responsibility"
+          : targetKind === "same_track" || targetKind === "same_track_better_conditions"
+            ? "better_conditions"
+            : "unclear";
+
+  const selfImageGapSignals: string[] = [];
+  if (signals.possibleSelfMinimizingLanguage)
+    selfImageGapSignals.push("Sprog indikerer mulig nedtoning af egne bidrag.");
+  if (profileModel.interpretations.some((i) => i.key === "direction_is_clearer_than_proof"))
+    selfImageGapSignals.push("Ønsket retning er tydeligere beskrevet end bevist.");
+  if (profileModel.hypotheses.some((h) => h.key === "target_direction_stronger_than_proven_evidence"))
+    selfImageGapSignals.push("Målretning fremstilles stærkere end evidensgrundlaget støtter.");
+  if (contradicting.length > 0) selfImageGapSignals.push("Interne modsætninger identificeret i svarene.");
+  if (claimsWithoutSupportingEvidence.length > 0)
+    selfImageGapSignals.push("Påstande uden understøttende evidens registreret.");
+  const selfImageGapSeverity: "low" | "medium" | "high" =
+    selfImageGapSignals.length >= 3 ? "high" : selfImageGapSignals.length >= 1 ? "medium" : "low";
+
   return {
     communicationStyle: { answerLength, abstractionLevel, selfReferences, tone },
     recruitmentFit: { communicationStyleMatchToRecruitmentExpectations, likelyUnderseller },
@@ -2172,6 +2263,13 @@ function buildCompletionAnalysis({
     energyMap: { energizers, drainers },
     credibilitySignals: { consistency, identifiedContradictions, claimsWithoutSupportingEvidence },
     recruitmentLogic: { type: rlType, confidence: rlConfidence },
+    behaviorProfile: {
+      behaviorUnderPressure,
+      naturalTeamRole,
+      decisionStyle,
+      ambitionProfile,
+      selfImageGap: { likelySeverity: selfImageGapSeverity, signals: selfImageGapSignals },
+    },
   };
 }
 
