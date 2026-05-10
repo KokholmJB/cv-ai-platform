@@ -179,6 +179,43 @@ type QuestionPriority = {
   unresolved: boolean;
 };
 
+type CommunicationStyleAnalysis = {
+  answerLength: "short" | "medium" | "narrative";
+  abstractionLevel: "concrete" | "conceptual";
+  selfReferences: "active_i" | "distancing_we";
+  tone: "direct" | "exploratory";
+};
+
+type RecruitmentFitAnalysis = {
+  communicationStyleMatchToRecruitmentExpectations: string;
+  likelyUnderseller: true | false | "uncertain";
+};
+
+type StrengthGapsAnalysis = {
+  explicitlyMentionedStrengths: string[];
+  implicitStrengthsFromExamples: string[];
+  discrepancyConfidence: "medium" | "low";
+};
+
+type EnergyMapAnalysis = {
+  energizers: string[];
+  drainers: string[];
+};
+
+type CredibilitySignalsAnalysis = {
+  consistency: "high" | "medium" | "low";
+  identifiedContradictions: string[];
+  claimsWithoutSupportingEvidence: string[];
+};
+
+type CompletionAnalysis = {
+  communicationStyle: CommunicationStyleAnalysis;
+  recruitmentFit: RecruitmentFitAnalysis;
+  strengthGaps: StrengthGapsAnalysis;
+  energyMap: EnergyMapAnalysis;
+  credibilitySignals: CredibilitySignalsAnalysis;
+};
+
 type InterviewProfileModel = {
   evidenceSources: EvidenceSourceState[];
   facts: ProfileFact[];
@@ -187,6 +224,7 @@ type InterviewProfileModel = {
   hypotheses: Hypothesis[];
   questionPriorities: QuestionPriority[];
   communicationSignals: CommunicationSignals;
+  completionAnalysis?: CompletionAnalysis;
 };
 
 type HypothesisSummaryItem = Pick<
@@ -1953,6 +1991,113 @@ function buildProvisionalProfileSummary({
   };
 }
 
+function buildCompletionAnalysis({
+  profileDraft,
+  profileSummary,
+  profileModel,
+  interviewState,
+}: {
+  profileDraft: ProfileDraft;
+  profileSummary: ProfileSummary;
+  profileModel: InterviewProfileModel;
+  interviewState: InterviewState;
+}): CompletionAnalysis {
+  const signals = profileModel.communicationSignals;
+
+  // communicationStyle
+  const answerLength: CommunicationStyleAnalysis["answerLength"] =
+    signals.answerStyle === "detailed" ? "narrative" : signals.answerStyle === "balanced" ? "medium" : "short";
+
+  const abstractionLevel: CommunicationStyleAnalysis["abstractionLevel"] =
+    signals.evidenceDensity === "low" ? "conceptual" : "concrete";
+
+  const selfReferenceText = normalizeText(
+    [profileDraft.yearsExperience ?? "", profileDraft.targetDirection ?? ""].join(" "),
+  );
+  const weCount = ["vi ", "vores ", " vi,", "vi har", "teamet", "gruppen"].filter((p) =>
+    selfReferenceText.includes(p),
+  ).length;
+  const iCount = ["jeg ", "jeg har", "jeg er", "mit ", "min ", "jeg gjorde", "jeg leverede"].filter((p) =>
+    selfReferenceText.includes(p),
+  ).length;
+  const selfReferences: CommunicationStyleAnalysis["selfReferences"] =
+    weCount > iCount ? "distancing_we" : "active_i";
+
+  const tone: CommunicationStyleAnalysis["tone"] =
+    signals.structureLevel === "high" || signals.answerStyle === "concise" ? "direct" : "exploratory";
+
+  // recruitmentFit
+  const targetKind = inferTargetProfileKind(profileDraft);
+  const isHighExpectationRole = (["next_level", "direction_change", "product_transition"] as TargetProfileKind[]).includes(
+    targetKind,
+  );
+
+  let communicationStyleMatchToRecruitmentExpectations: string;
+  if (signals.evidenceDensity === "high" && !signals.possibleSelfMinimizingLanguage) {
+    communicationStyleMatchToRecruitmentExpectations =
+      "Svarmønstret indeholder konkrete eksempler og tydelig ejerskabsformulering, hvilket matcher rekrutteringsforventninger til rollen.";
+  } else if (signals.possibleSelfMinimizingLanguage) {
+    communicationStyleMatchToRecruitmentExpectations =
+      "Svarmønstret viser tegn på nedtoning af egne bidrag, hvilket kan undervurdere profilen i en rekrutteringskontekst.";
+  } else if (isHighExpectationRole && signals.evidenceDensity === "low") {
+    communicationStyleMatchToRecruitmentExpectations =
+      "Svarmønstret mangler konkrete eksempler i forhold til den ønskede retning, hvilket kan svække profilen i rekruttering.";
+  } else {
+    communicationStyleMatchToRecruitmentExpectations =
+      "Kommunikationsstilen er tilstrækkelig til en foreløbig profil, men kan styrkes med mere evidensbaserede formuleringer.";
+  }
+
+  const likelyUnderseller: RecruitmentFitAnalysis["likelyUnderseller"] = signals.possibleSelfMinimizingLanguage
+    ? true
+    : signals.evidenceDensity === "high"
+      ? false
+      : "uncertain";
+
+  // strengthGaps
+  const explicitlyMentionedStrengths = profileModel.facts
+    .filter((fact) => fact.evidenceLevel === "explicit" && !["current_role", "target_direction"].includes(fact.key))
+    .map((fact) => fact.statement);
+
+  const implicitStrengthsFromExamples = profileModel.interpretations
+    .filter((interp) => interp.confidence !== "low" && interp.evidenceSignals.length > 0)
+    .map((interp) => interp.statement);
+
+  const discrepancyConfidence: StrengthGapsAnalysis["discrepancyConfidence"] = profileModel.interpretations.some(
+    (interp) => interp.confidence === "low",
+  )
+    ? "low"
+    : "medium";
+
+  // energyMap
+  const energizers: string[] = [];
+  if (interviewState.coverage.motivationFit) {
+    energizers.push(profileSummary.aiProfileCore.workStyleFit);
+  }
+  for (const strength of profileSummary.aiProfileCore.transferableStrengths) {
+    if (hasMotivationSignal(strength)) {
+      energizers.push(strength);
+    }
+  }
+  const drainers = profileSummary.aiProfileCore.mismatchRisks.slice();
+
+  // credibilitySignals
+  const contradicting = profileModel.hypotheses.filter((hyp) => hyp.contradictionLevel !== "none");
+  const identifiedContradictions = contradicting.map((hyp) => hyp.statement);
+  const claimsWithoutSupportingEvidence = profileModel.interpretations
+    .filter((interp) => interp.confidence === "low" && interp.evidenceSignals.length === 0)
+    .map((interp) => interp.statement);
+  const consistency: CredibilitySignalsAnalysis["consistency"] =
+    contradicting.length === 0 ? "high" : contradicting.length === 1 ? "medium" : "low";
+
+  return {
+    communicationStyle: { answerLength, abstractionLevel, selfReferences, tone },
+    recruitmentFit: { communicationStyleMatchToRecruitmentExpectations, likelyUnderseller },
+    strengthGaps: { explicitlyMentionedStrengths, implicitStrengthsFromExamples, discrepancyConfidence },
+    energyMap: { energizers, drainers },
+    credibilitySignals: { consistency, identifiedContradictions, claimsWithoutSupportingEvidence },
+  };
+}
+
 function buildDeterministicCompleteResult({
   profileDraft,
   interviewState,
@@ -1969,12 +2114,20 @@ function buildDeterministicCompleteResult({
     lastUserAnswer: null,
     profileSummary,
   });
-  const completedProfileModel = buildInterviewProfileModel({
-    profileDraft,
-    interviewState: completedInterviewState,
-    profileSummary,
-    lastUserAnswer: null,
-  });
+  const completedProfileModel: InterviewProfileModel = {
+    ...buildInterviewProfileModel({
+      profileDraft,
+      interviewState: completedInterviewState,
+      profileSummary,
+      lastUserAnswer: null,
+    }),
+    completionAnalysis: buildCompletionAnalysis({
+      profileDraft,
+      profileSummary,
+      profileModel,
+      interviewState: completedInterviewState,
+    }),
+  };
 
   return {
     ok: true,
