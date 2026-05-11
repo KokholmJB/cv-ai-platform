@@ -1,8 +1,8 @@
 # TASK_BOARD
 ## Current focus
-Dimension 4: livsstil og arbejdsliv-balance.
+Dimension 1 og 3: iterativ styrkelse.
 ## Næste workstream
-1. Dimension 4: livsstil og arbejdsliv-balance
+1. Dimension 1 og 3: iterativ styrkelse
 ## Recently completed
 - Kontomigration gennemført og verificeret
 - Transition completion gate implementeret og testet
@@ -16,6 +16,7 @@ Dimension 4: livsstil og arbejdsliv-balance.
 - Analyse-lag implementeret i route.ts (communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals)
 - Dimension 5: recruitmentLogic klassificering tilføjet til completionAnalysis
 - Dimension 2: behaviorProfile tilføjet (behaviorUnderPressure, naturalTeamRole, decisionStyle, ambitionProfile, selfImageGap)
+- Dimension 4: lifestyleProfile tilføjet (workIntensityPreference, flexibilityNeeds, lifestyleFit, sustainabilityRisk)
 ## Known limitations
 - specialist-expert og project-manager-to-product-manager earlyCompletionWarning — stokastisk LLM-varians, ikke regressionsfejl
 ## Parked / later
