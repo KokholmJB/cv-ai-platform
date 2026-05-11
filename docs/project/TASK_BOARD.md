@@ -3,6 +3,8 @@
 Commit og push af ekstra kapaciteter A/B/C.
 ## Næste workstream
 1. Commit og push af route.ts med hiddenStrengths, energyConditions, interviewReadiness
+2. Interviewmotor: afdæk autenticitetsprofil aktivt under interview (APPLICATION_PROFILE_REQUIREMENTS.md)
+3. M1 gate: kør fuld test-suite tre gange før godkendelse
 ## Recently completed
 - Ekstra kapacitet A (hiddenStrengths), B (energyConditions), C (interviewReadiness) tilføjet til completionAnalysis
 - Kontomigration gennemført og verificeret

@@ -22,3 +22,4 @@
 11. De fem dimensioner er: faglig profil, personprofil og adfærdsmønster, kommunikationsprofil, livsstil og arbejdsliv-balance, rekrutteringsflexibilitet.
 12. Tre ekstra kapaciteter tilføjes: styrkeblinde pletter, energikort over arbejdslivet, troværdighedsvurdering.
 13. Dette er V1-scope — ikke future backlog.
+14. Systemet skal understøtte et adaptivt autenticitets- og værdimatchlag i profil og ansøgningsgenerering. Dette er V1-scope, ikke backlog. Krav er defineret i APPLICATION_PROFILE_REQUIREMENTS.md. (Godkendt Session 2, 2026-05-11)
