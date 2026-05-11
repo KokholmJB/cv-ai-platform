@@ -251,6 +251,20 @@ type EvidenceProfileAnalysis = {
   transferableStrengths: string[];
 };
 
+type RecruitmentFormatVulnerability =
+  | "structured_competency"
+  | "case_interview"
+  | "presentation"
+  | "small_talk"
+  | "none_identified";
+
+type CommunicationProfileAnalysis = {
+  selfPromotionComfort: "undersells" | "balanced" | "oversells";
+  recruitmentFormatVulnerabilities: RecruitmentFormatVulnerability[];
+  credibilityInConversation: "strong" | "moderate" | "weak";
+  languageNormalization: "minimizes" | "neutral" | "overstates";
+};
+
 type CompletionAnalysis = {
   communicationStyle: CommunicationStyleAnalysis;
   recruitmentFit: RecruitmentFitAnalysis;
@@ -261,6 +275,7 @@ type CompletionAnalysis = {
   behaviorProfile: BehaviorProfileAnalysis;
   lifestyleProfile: LifestyleProfileAnalysis;
   evidenceProfile: EvidenceProfileAnalysis;
+  communicationProfile: CommunicationProfileAnalysis;
 };
 
 type InterviewProfileModel = {
@@ -2440,6 +2455,47 @@ function buildCompletionAnalysis({
       sustainabilityRisk,
     },
     evidenceProfile: { evidenceClassification, evidenceStrengthVsGoal, transferableStrengths },
+    communicationProfile: (() => {
+      // selfPromotionComfort
+      const undersellCount =
+        (signals.possibleSelfMinimizingLanguage ? 1 : 0) + (selfReferences === "distancing_we" ? 1 : 0);
+      const oversellCount =
+        (claimsWithoutSupportingEvidence.length >= 1 ? 1 : 0) +
+        (consistency === "low" ? 1 : 0) +
+        (selfImageGapSeverity === "high" ? 1 : 0);
+      const selfPromotionComfort: CommunicationProfileAnalysis["selfPromotionComfort"] =
+        undersellCount >= 1 ? "undersells" : oversellCount >= 2 ? "oversells" : "balanced";
+
+      // recruitmentFormatVulnerabilities
+      const recruitmentFormatVulnerabilities: RecruitmentFormatVulnerability[] = [];
+      if (signals.structureLevel === "low" && signals.evidenceDensity === "low")
+        recruitmentFormatVulnerabilities.push("structured_competency");
+      if (abstractionLevel === "conceptual" && signals.evidenceDensity === "low")
+        recruitmentFormatVulnerabilities.push("case_interview");
+      if (signals.possibleOverlongExplanations || (tone === "exploratory" && signals.structureLevel === "low"))
+        recruitmentFormatVulnerabilities.push("presentation");
+      if (selfReferences === "distancing_we" && signals.structureLevel === "high")
+        recruitmentFormatVulnerabilities.push("small_talk");
+      if (recruitmentFormatVulnerabilities.length === 0) recruitmentFormatVulnerabilities.push("none_identified");
+
+      // credibilityInConversation
+      const credibilityInConversation: CommunicationProfileAnalysis["credibilityInConversation"] =
+        signals.evidenceDensity === "high" && consistency === "high" && !signals.possibleSelfMinimizingLanguage
+          ? "strong"
+          : consistency === "low" || (signals.evidenceDensity === "low" && signals.possibleSelfMinimizingLanguage)
+            ? "weak"
+            : "moderate";
+
+      // languageNormalization
+      const languageNormalization: CommunicationProfileAnalysis["languageNormalization"] =
+        signals.possibleSelfMinimizingLanguage || selfReferences === "distancing_we"
+          ? "minimizes"
+          : claimsWithoutSupportingEvidence.length >= 2 && consistency !== "high"
+            ? "overstates"
+            : "neutral";
+
+      return { selfPromotionComfort, recruitmentFormatVulnerabilities, credibilityInConversation, languageNormalization };
+    })(),
   };
 }
 
