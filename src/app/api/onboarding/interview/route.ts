@@ -3989,6 +3989,41 @@ function buildInterviewProfileModel({
     unresolved: !coverage.workStyleFit,
   });
 
+  // Dimension 2: behavior under pressure (personprofil og adfærdsmønster)
+  addQuestionPriority(questionPriorities, {
+    key: "behavior_under_pressure",
+    statement: "Afklar, hvordan brugeren reagerer under pres, modstand eller uenighed.",
+    question: "Hvordan reagerer du typisk, når der opstår pres, modstand eller uenighed i et projekt eller på arbejdet?",
+    focusArea: "mismatch_risk",
+    score: coverage.mismatchRisk ? 17 : 70,
+    reason: "Adfærd under pres afslører naturlige styrker, begrænsninger og passende arbejdsmiljø.",
+    unresolved: !coverage.mismatchRisk,
+  });
+
+  // Dimension 2: natural team role and ambition direction (personprofil og adfærdsmønster)
+  addQuestionPriority(questionPriorities, {
+    key: "natural_team_role",
+    statement: "Afklar brugerens naturlige rolle i teamsamarbejde.",
+    question:
+      "Hvilken rolle er du typisk stærkest i, når du arbejder med andre — er det at starte og drive, koordinere og holde overblik, eller gå fagligt i dybden?",
+    focusArea: "work_style_fit",
+    score: coverage.workStyleFit ? 15 : 68,
+    reason: "Teamrollen siger noget konkret om arbejdsstil, ansvarsniveau og passende rolletyper.",
+    unresolved: !coverage.workStyleFit,
+  });
+
+  // Dimension 4: work intensity, pace, and practical conditions (livsstil og arbejdsliv-balance)
+  addQuestionPriority(questionPriorities, {
+    key: "work_conditions_preferences",
+    statement: "Afklar foretrukket arbejdstempo, intensitet og hverdagsbetingelser.",
+    question:
+      "Hvad er vigtigst for dig i de daglige arbejdsvilkår — er det tempo, fleksibilitet, arbejdstider eller noget andet, der reelt har betydning for dit næste job?",
+    focusArea: "work_style_fit",
+    score: coverage.motivationFit ? 13 : 66,
+    reason: "Konkrete betingelsespræferencer og tempokrav påvirker jobpasset og bæredygtighed direkte.",
+    unresolved: !coverage.motivationFit,
+  });
+
   questionPriorities.sort((a, b) => b.score - a.score);
 
   return {
