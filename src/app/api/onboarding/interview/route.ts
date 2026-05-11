@@ -238,6 +238,19 @@ type LifestyleProfileAnalysis = {
   sustainabilityRisk: "low" | "medium" | "high";
 };
 
+type EvidenceClassification =
+  | "user_claim"
+  | "concrete_example"
+  | "proven_responsibility"
+  | "measurable_result"
+  | "pattern";
+
+type EvidenceProfileAnalysis = {
+  evidenceClassification: { strength: string; classification: EvidenceClassification }[];
+  evidenceStrengthVsGoal: "sufficient" | "borderline" | "insufficient";
+  transferableStrengths: string[];
+};
+
 type CompletionAnalysis = {
   communicationStyle: CommunicationStyleAnalysis;
   recruitmentFit: RecruitmentFitAnalysis;
@@ -247,6 +260,7 @@ type CompletionAnalysis = {
   recruitmentLogic: RecruitmentLogicAnalysis;
   behaviorProfile: BehaviorProfileAnalysis;
   lifestyleProfile: LifestyleProfileAnalysis;
+  evidenceProfile: EvidenceProfileAnalysis;
 };
 
 type InterviewProfileModel = {
@@ -2333,6 +2347,78 @@ function buildCompletionAnalysis({
           ? "medium"
           : "low";
 
+  // evidenceProfile (dimension 1)
+  const evidenceClassification: EvidenceProfileAnalysis["evidenceClassification"] =
+    profileModel.interpretations.map((interp) => {
+      const hasResultSignal = interp.evidenceSignals.some(
+        (s) => s.includes("result") || s.includes("evidence_depth"),
+      );
+      const hasOwnershipSignal = interp.evidenceSignals.some(
+        (s) => s.includes("ownership") || s.includes("scope"),
+      );
+      const isClaim = interp.confidence === "low" || interp.evidenceSignals.length === 0;
+      const isPattern = interp.evidenceSignals.length >= 3;
+
+      const classification: EvidenceClassification = isClaim
+        ? "user_claim"
+        : isPattern
+          ? "pattern"
+          : interviewState.evidenceCounts.resultEvidenceCount >= 1 && hasResultSignal
+            ? "measurable_result"
+            : interviewState.evidenceCounts.ownershipScopeCount >= 1 && hasOwnershipSignal
+              ? "proven_responsibility"
+              : "concrete_example";
+
+      return { strength: interp.statement, classification };
+    });
+
+  const totalEvidenceScore =
+    interviewState.evidenceCounts.resultEvidenceCount +
+    interviewState.evidenceCounts.ownershipScopeCount +
+    interviewState.evidenceCounts.concreteEvidenceCount;
+
+  const evidenceStrengthVsGoal: EvidenceProfileAnalysis["evidenceStrengthVsGoal"] =
+    targetKind === "next_level"
+      ? totalEvidenceScore >= 3
+        ? "sufficient"
+        : totalEvidenceScore >= 1
+          ? "borderline"
+          : "insufficient"
+      : targetKind === "direction_change" ||
+          targetKind === "product_transition" ||
+          targetKind === "specialist_track"
+        ? interviewState.evidenceCounts.concreteEvidenceCount >= 2
+          ? "sufficient"
+          : interviewState.evidenceCounts.concreteEvidenceCount >= 1
+            ? "borderline"
+            : "insufficient"
+        : targetKind === "same_track" ||
+            targetKind === "same_track_better_conditions" ||
+            targetKind === "less_responsibility"
+          ? totalEvidenceScore >= 1
+            ? "sufficient"
+            : "borderline"
+          : totalEvidenceScore >= 2
+            ? "sufficient"
+            : totalEvidenceScore >= 1
+              ? "borderline"
+              : "insufficient";
+
+  const templatePhrases = ["foerste billede", "brugbart", "foreloebig", "evidence-aware"];
+  const transferableStrengths: EvidenceProfileAnalysis["transferableStrengths"] = [
+    ...profileSummary.aiProfileCore.transferableStrengths.filter(
+      (s) => s.trim().length > 0 && !templatePhrases.some((p) => s.includes(p)),
+    ),
+    ...profileModel.interpretations
+      .filter(
+        (i) =>
+          i.confidence !== "low" &&
+          i.evidenceSignals.some((s) => s.includes("transferable") || s.includes("cross_functional")),
+      )
+      .map((i) => i.statement)
+      .filter((s) => !profileSummary.aiProfileCore.transferableStrengths.includes(s)),
+  ];
+
   return {
     communicationStyle: { answerLength, abstractionLevel, selfReferences, tone },
     recruitmentFit: { communicationStyleMatchToRecruitmentExpectations, likelyUnderseller },
@@ -2353,6 +2439,7 @@ function buildCompletionAnalysis({
       lifestyleFit,
       sustainabilityRisk,
     },
+    evidenceProfile: { evidenceClassification, evidenceStrengthVsGoal, transferableStrengths },
   };
 }
 
