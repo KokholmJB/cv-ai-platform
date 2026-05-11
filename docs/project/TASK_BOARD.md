@@ -1,9 +1,10 @@
 # TASK_BOARD
 ## Current focus
-Ekstra kapaciteter A (styrkeblinde pletter), B (energikort), C (troværdighedsvurdering).
+Commit og push af ekstra kapaciteter A/B/C.
 ## Næste workstream
-1. Ekstra kapaciteter A, B, C fra PROFILE_ENGINE_REQUIREMENTS.md V2
+1. Commit og push af route.ts med hiddenStrengths, energyConditions, interviewReadiness
 ## Recently completed
+- Ekstra kapacitet A (hiddenStrengths), B (energyConditions), C (interviewReadiness) tilføjet til completionAnalysis
 - Kontomigration gennemført og verificeret
 - Transition completion gate implementeret og testet
 - stash@{0} applied rent — profile view model arkitektur på plads

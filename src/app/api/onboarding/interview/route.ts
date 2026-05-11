@@ -276,6 +276,9 @@ type CompletionAnalysis = {
   lifestyleProfile: LifestyleProfileAnalysis;
   evidenceProfile: EvidenceProfileAnalysis;
   communicationProfile: CommunicationProfileAnalysis;
+  hiddenStrengths: string[];
+  energyConditions: { peaksAt: string[]; strugglesAt: string[] };
+  interviewReadiness: { overall: "ready" | "needs_preparation" | "significant_gaps"; vulnerabilities: string[] };
 };
 
 type InterviewProfileModel = {
@@ -2495,6 +2498,60 @@ function buildCompletionAnalysis({
             : "neutral";
 
       return { selfPromotionComfort, recruitmentFormatVulnerabilities, credibilityInConversation, languageNormalization };
+    })(),
+    hiddenStrengths: (() => {
+      const explicitSet = new Set(explicitlyMentionedStrengths.map((s) => s.trim().toLowerCase()));
+      return profileModel.interpretations
+        .filter(
+          (interp) =>
+            interp.confidence !== "low" &&
+            interp.evidenceSignals.length >= 1 &&
+            !explicitSet.has(interp.statement.trim().toLowerCase()),
+        )
+        .map((interp) => interp.statement.trim())
+        .filter((s) => s.length > 0)
+        .slice(0, 4);
+    })(),
+    energyConditions: (() => {
+      const peaksAt: string[] = [...energizers.slice(0, 2)];
+      const strugglesAt: string[] = [...drainers.slice(0, 2)];
+      if (workLocation === "remote") peaksAt.push("selvstændigt, fjernbaseret arbejde");
+      if (workLocation === "onsite") peaksAt.push("fysisk team-samvær og kontorbaseret samarbejde");
+      if (scheduleFlexibility === "high") peaksAt.push("fleksibelt tidsstyret arbejde");
+      if (workIntensityPreference === "steady") {
+        peaksAt.push("roligt og forudsigeligt arbejdstempo");
+        strugglesAt.push("vedvarende højtryksperioder");
+      }
+      if (workIntensityPreference === "high") peaksAt.push("ambitiøse mål og høj kadence");
+      if (sustainabilityRisk === "high") strugglesAt.push("langvarig overbelastning uden pauser");
+      if (naturalTeamRole === "coordinator") peaksAt.push("tværgående samarbejde med klare roller");
+      if (naturalTeamRole === "executor") peaksAt.push("konkrete leverancer med tydelige mål");
+      return {
+        peaksAt: [...new Set(peaksAt)].slice(0, 4),
+        strugglesAt: [...new Set(strugglesAt)].slice(0, 4),
+      };
+    })(),
+    interviewReadiness: (() => {
+      const vulnerabilities: string[] = [];
+      if (evidenceStrengthVsGoal === "insufficient")
+        vulnerabilities.push("Mangel på konkrete eksempler til at underbygge styrker");
+      if (evidenceStrengthVsGoal === "borderline")
+        vulnerabilities.push("Forholdsvis få konkrete eksempler — sårbar over for dybdeboringer");
+      if (selfImageGapSeverity === "high")
+        vulnerabilities.push("Selviscenesættelse matcher muligvis ikke faktiske signaler");
+      if (likelyUnderseller === true)
+        vulnerabilities.push("Tendens til at undervurdere egne bidrag i rekrutteringssituationer");
+      if (consistency === "low")
+        vulnerabilities.push("Mulige modsigelser i svar — kan svækkes ved direkte opfølgning");
+      if (claimsWithoutSupportingEvidence.length >= 2)
+        vulnerabilities.push("Adskillige påstande uden tilstrækkelig støtte");
+      const overall: "ready" | "needs_preparation" | "significant_gaps" =
+        vulnerabilities.length === 0 && evidenceStrengthVsGoal === "sufficient"
+          ? "ready"
+          : vulnerabilities.length >= 3 || evidenceStrengthVsGoal === "insufficient"
+            ? "significant_gaps"
+            : "needs_preparation";
+      return { overall, vulnerabilities };
     })(),
   };
 }
