@@ -1,10 +1,32 @@
 # TASK_BOARD
 ## Current focus
 Commit og push af ekstra kapaciteter A/B/C.
-## Næste workstream
-1. Commit og push af route.ts med hiddenStrengths, energyConditions, interviewReadiness
-2. Interviewmotor: afdæk autenticitetsprofil aktivt under interview (APPLICATION_PROFILE_REQUIREMENTS.md)
-3. M1 gate: kør fuld test-suite tre gange før godkendelse
+## P1 — Blokerer M1-gate (skal laves først)
+1. Indholdsvalidering af completionAnalysis-felter pr. scenarie
+2. Anti-keyword-validering pr. scenarie
+3. Autenticitetsprofil implementeret i motor og tests
+
+## P2 — Kritisk før M1-gate
+4. Fire nye segment-scenarier: executive, ledig, trade-transition, SOSU same-track
+5. Rekrutteringslogik-scenarier til dimension 5
+6. Adfærdsmønster-validering dimension 2
+
+## P3 — Venter til M2
+7. Adaptiv kommunikation differentialtest
+8. Modsigelsestest for credibilitySignals
+9. Vi/jeg-sprogtest
+10. Low-clarity coverage udvidelse
+11. Diversity/bias-aggregattest (før M3)
+
+## M1-gate kriterier (alle skal være opfyldt)
+- P1 og P2 opgaver completed
+- test:interview-scenarios: 10 PASS 0 WARN 0 FAIL på tre kørsler
+- test:interview-manual-regression: bestået
+- test:interview-low-clarity: bestået
+- test:setup-ux-review: 0 WARN 0 FAIL
+- Indholdsvalidering af completionAnalysis aktiv
+- Autenticitetsprofil testet
+- Projektstyring godkender eksplicit
 ## Recently completed
 - Ekstra kapacitet A (hiddenStrengths), B (energyConditions), C (interviewReadiness) tilføjet til completionAnalysis
 - Kontomigration gennemført og verificeret

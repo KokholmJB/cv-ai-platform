@@ -23,3 +23,7 @@
 12. Tre ekstra kapaciteter tilføjes: styrkeblinde pletter, energikort over arbejdslivet, troværdighedsvurdering.
 13. Dette er V1-scope — ikke future backlog.
 14. Systemet skal understøtte et adaptivt autenticitets- og værdimatchlag i profil og ansøgningsgenerering. Dette er V1-scope, ikke backlog. Krav er defineret i APPLICATION_PROFILE_REQUIREMENTS.md. (Godkendt Session 2, 2026-05-11)
+15. M1-gate kræver indholdsvalidering af completionAnalysis-felter — ikke kun antal-tælling. (Godkendt Session 2, 2026-05-11)
+16. Autenticitetsprofil implementeres i interviewmotor og tests som V1-scope før M1-gate. (Godkendt Session 2, 2026-05-11)
+17. Fire manglende segment-scenarier tilføjes før M1-gate: executive, ledig, trade-transition, SOSU same-track. (Godkendt Session 2, 2026-05-11)
+18. Diversity/bias-aggregattest landes før M3 — ikke M1. (Godkendt Session 2, 2026-05-11)

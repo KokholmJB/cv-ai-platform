@@ -15,7 +15,9 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - npm.cmd run build: pass
 - npm.cmd run test:interview-scenarios: 10 PASS / 0 WARN / 0 FAIL (ekstra kapaciteter A/B/C implementeret)
 ## Næste workstream
-- Commit og push af ekstra kapaciteter A/B/C
+- P1 opgaver fra test-analyse (indholdsvalidering completionAnalysis, anti-keyword-validering, autenticitetsprofil)
+## M1-gate
+- M1-gate kriterier defineret og aktive (se TASK_BOARD.md)
 ## Kendte begrænsninger
 - /profile er stadig tidlig og uden persistence
 - Ingen auth/database/payment/persistence endnu
