@@ -1,9 +1,8 @@
 # TEST_LOG
 
 ## Latest confirmed state (known)
-- `npm.cmd run build`: pass (commit 62954c0)
-- `npm.cmd run test:interview-scenarios`: 9 PASS / 1 WARN / 0 FAIL (commit 62954c0)
-  - WARN: pre-existing stokastisk variance, ikke fejl
+- `npm.cmd run build`: pass (alle fem dimensioner implementeret)
+- `npm.cmd run test:interview-scenarios`: 10 PASS / 0 WARN / 0 FAIL (alle fem dimensioner implementeret)
 - `npm.cmd run test:setup-ux-review`: pass (main baseline — ikke re-kørt efter motor-ændringer)
   - `interview completed=true`
   - `screenshots=11`

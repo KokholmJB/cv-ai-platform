@@ -1,8 +1,8 @@
 # TASK_BOARD
 ## Current focus
-Dimension 1 og 3: iterativ styrkelse.
+Ekstra kapaciteter A (styrkeblinde pletter), B (energikort), C (troværdighedsvurdering).
 ## Næste workstream
-1. Dimension 1 og 3: iterativ styrkelse
+1. Ekstra kapaciteter A, B, C fra PROFILE_ENGINE_REQUIREMENTS.md V2
 ## Recently completed
 - Kontomigration gennemført og verificeret
 - Transition completion gate implementeret og testet
@@ -17,6 +17,8 @@ Dimension 1 og 3: iterativ styrkelse.
 - Dimension 5: recruitmentLogic klassificering tilføjet til completionAnalysis
 - Dimension 2: behaviorProfile tilføjet (behaviorUnderPressure, naturalTeamRole, decisionStyle, ambitionProfile, selfImageGap)
 - Dimension 4: lifestyleProfile tilføjet (workIntensityPreference, flexibilityNeeds, lifestyleFit, sustainabilityRisk)
+- Dimension 1: evidenceProfile tilføjet (evidenceClassification, evidenceStrengthVsGoal, transferableStrengths)
+- Dimension 3: communicationProfile tilføjet (selfPromotionComfort, recruitmentFormatVulnerabilities, credibilityInConversation, languageNormalization)
 ## Known limitations
 - specialist-expert og project-manager-to-product-manager earlyCompletionWarning — stokastisk LLM-varians, ikke regressionsfejl
 ## Parked / later
