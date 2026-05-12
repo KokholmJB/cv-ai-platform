@@ -2599,6 +2599,7 @@ function buildCompletionAnalysis({
     })(),
     interviewReadiness: (() => {
       const vulnerabilities: string[] = [];
+      // existing signals
       if (evidenceStrengthVsGoal === "insufficient")
         vulnerabilities.push("Mangel på konkrete eksempler til at underbygge styrker");
       if (evidenceStrengthVsGoal === "borderline")
@@ -2611,12 +2612,39 @@ function buildCompletionAnalysis({
         vulnerabilities.push("Mulige modsigelser i svar — kan svækkes ved direkte opfølgning");
       if (claimsWithoutSupportingEvidence.length >= 2)
         vulnerabilities.push("Adskillige påstande uden tilstrækkelig støtte");
+      // new: broader evidence weakness label
+      if (evidenceStrengthVsGoal === "insufficient" || evidenceStrengthVsGoal === "borderline")
+        vulnerabilities.push("Svag evidens for målniveau");
+      // new: undersell tendency via broader selfPromotionComfort signal
+      if (signals.possibleSelfMinimizingLanguage || selfReferences === "distancing_we")
+        vulnerabilities.push("Tendens til undersalg");
+      // new: unclear direction in interview format
+      if (targetKind === "unclear" || targetKind === "direction_change")
+        vulnerabilities.push("Uklar retning i samtaleformat");
+      // new: weak structured communication at senior level
+      if (targetKind === "next_level" && signals.structureLevel === "low")
+        vulnerabilities.push("Svag struktureret kommunikation");
+      // new: missing concrete examples — many interpretations are unverified claims
+      if (evidenceClassification.filter((e) => e.classification === "user_claim").length >= 3)
+        vulnerabilities.push("Manglende konkrete eksempler");
+      // new: vulnerability to competency-based questions (proxy: low structure = structured_competency signal)
+      if (signals.structureLevel === "low")
+        vulnerabilities.push("Sårbarhed over for kompetencebaserede spørgsmål");
+      // new: transition without proven experience
+      if (
+        (targetKind === "product_transition" || targetKind === "direction_change") &&
+        evidenceStrengthVsGoal !== "sufficient"
+      )
+        vulnerabilities.push("Overgang uden bevist erfaring");
       const overall: "ready" | "needs_preparation" | "significant_gaps" =
-        vulnerabilities.length === 0 && evidenceStrengthVsGoal === "sufficient"
-          ? "ready"
-          : vulnerabilities.length >= 3 || evidenceStrengthVsGoal === "insufficient"
-            ? "significant_gaps"
-            : "needs_preparation";
+        vulnerabilities.length >= 4 ||
+        (evidenceStrengthVsGoal === "insufficient" && selfImageGapSeverity === "high")
+          ? "significant_gaps"
+          : vulnerabilities.length >= 2 ||
+              evidenceStrengthVsGoal === "insufficient" ||
+              selfImageGapSeverity === "high"
+            ? "needs_preparation"
+            : "ready";
       return { overall, vulnerabilities };
     })(),
   };
