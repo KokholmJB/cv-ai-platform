@@ -2525,16 +2525,27 @@ function buildCompletionAnalysis({
         undersellCount >= 1 ? "undersells" : oversellCount >= 2 ? "oversells" : "balanced";
 
       // recruitmentFormatVulnerabilities
-      const recruitmentFormatVulnerabilities: RecruitmentFormatVulnerability[] = [];
-      if (signals.structureLevel === "low" && signals.evidenceDensity === "low")
-        recruitmentFormatVulnerabilities.push("structured_competency");
-      if (abstractionLevel === "conceptual" && signals.evidenceDensity === "low")
-        recruitmentFormatVulnerabilities.push("case_interview");
+      const rfvSet = new Set<Exclude<RecruitmentFormatVulnerability, "none_identified">>();
+      // structured_competency
+      if (signals.structureLevel === "low") rfvSet.add("structured_competency");
+      if (abstractionLevel === "conceptual" && signals.evidenceDensity === "low") rfvSet.add("structured_competency");
+      if (signals.possibleSelfMinimizingLanguage) rfvSet.add("structured_competency");
+      if (targetKind === "next_level" && signals.evidenceDensity !== "high") rfvSet.add("structured_competency");
+      // case_interview
+      if (targetKind === "product_transition" || targetKind === "direction_change") rfvSet.add("case_interview");
+      if (abstractionLevel === "conceptual" && signals.structureLevel !== "high") rfvSet.add("case_interview");
+      if (targetKind === "specialist_track" && signals.evidenceDensity === "low") rfvSet.add("case_interview");
+      // presentation
       if (signals.possibleOverlongExplanations || (tone === "exploratory" && signals.structureLevel === "low"))
-        recruitmentFormatVulnerabilities.push("presentation");
-      if (selfReferences === "distancing_we" && signals.structureLevel === "high")
-        recruitmentFormatVulnerabilities.push("small_talk");
-      if (recruitmentFormatVulnerabilities.length === 0) recruitmentFormatVulnerabilities.push("none_identified");
+        rfvSet.add("presentation");
+      if (targetKind === "next_level" && signals.structureLevel === "low") rfvSet.add("presentation");
+      // small_talk
+      if (selfReferences === "distancing_we" && signals.structureLevel === "high") rfvSet.add("small_talk");
+      if (signals.answerStyle === "concise") rfvSet.add("small_talk");
+      if (signals.structureLevel === "high" && tone === "direct") rfvSet.add("small_talk");
+      if (iCount < 3) rfvSet.add("small_talk");
+      const recruitmentFormatVulnerabilities: RecruitmentFormatVulnerability[] =
+        rfvSet.size > 0 ? [...rfvSet] : ["none_identified"];
 
       // credibilityInConversation
       const credibilityInConversation: CommunicationProfileAnalysis["credibilityInConversation"] =
