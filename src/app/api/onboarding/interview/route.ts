@@ -2246,6 +2246,7 @@ function buildCompletionAnalysis({
     coordinator: 0,
     specialist: 0,
   };
+  // primary targetKind and evidence signals
   if (targetKind === "next_level") ntrScores.initiator += 3;
   if (interviewState.evidenceCounts.ownershipScopeCount >= 2) ntrScores.initiator += 1;
   if (profileModel.interpretations.some((i) => i.key === "execution_and_coordination_strength"))
@@ -2254,8 +2255,37 @@ function buildCompletionAnalysis({
   if (targetKind === "same_track" || targetKind === "same_track_better_conditions") ntrScores.executor += 2;
   if (interviewState.evidenceCounts.resultEvidenceCount >= 2) ntrScores.executor += 1;
   if (targetKind === "specialist_track") ntrScores.specialist += 3;
+  // supplementary interpretation key signals
+  if (profileModel.interpretations.some((i) => i.key === "product_transition_gap")) ntrScores.coordinator += 2;
+  if (profileModel.interpretations.some((i) => i.key === "product_adjacent_transition")) ntrScores.coordinator += 1;
+  if (profileModel.interpretations.some((i) => i.key === "specialist_track_preference")) ntrScores.specialist += 2;
+  if (profileModel.interpretations.some((i) => i.key === "specialist_technical_leadership")) ntrScores.specialist += 2;
+  if (profileModel.interpretations.some((i) => i.key === "less_responsibility_direction")) ntrScores.executor += 1;
+  // text-based scan of interpretation statements for coordination and execution language
+  const ntrInterpStatements = profileModel.interpretations.map((i) => i.statement.toLowerCase());
+  if (["koordiner", "beslutningsstøtte", "prioriteringsstøtte", "tværgående"].some((w) => ntrInterpStatements.some((s) => s.includes(w))))
+    ntrScores.coordinator += 1;
+  if (["leverance", "leverer", "hands-on ekspertise", "faglig dybde"].some((w) => ntrInterpStatements.some((s) => s.includes(w))))
+    ntrScores.executor += 1;
+  // hypothesis key signals for coordination and specialist
+  if (profileModel.hypotheses.some((h) => h.key === "product_adjacent_transition_stronger_than_full_pm")) ntrScores.coordinator += 1;
+  if (profileModel.hypotheses.some((h) => h.key === "leadership_vs_coordination_scope")) ntrScores.coordinator += 1;
+  // communication signals: high structure + non-low evidence density lean toward specialist or executor
+  if (signals.structureLevel === "high" && signals.evidenceDensity !== "low") {
+    if (ntrScores.specialist > 0) ntrScores.specialist += 1;
+    else ntrScores.executor += 1;
+  }
+  // when workStyleFit is covered and structure is high, reinforce specialist if already signaled
+  if (interviewState.coverage.workStyleFit && signals.structureLevel === "high" && ntrScores.specialist > 0)
+    ntrScores.specialist += 1;
   const ntrSorted = (Object.entries(ntrScores) as [Exclude<NTR, "unclear">, number][]).sort((a, b) => b[1] - a[1]);
-  const naturalTeamRole: NTR = ntrSorted[0][1] >= 2 ? ntrSorted[0][0] : "unclear";
+  // prefer reasonable inference over "unclear" unless signals are genuinely contradictory (tied at top)
+  const naturalTeamRole: NTR =
+    ntrSorted[0][1] >= 2
+      ? ntrSorted[0][0]
+      : ntrSorted[0][1] === 1 && ntrSorted[1][1] === 0
+        ? ntrSorted[0][0]
+        : "unclear";
 
   type DS = BehaviorProfileAnalysis["decisionStyle"];
   const dsScores: Record<DS, number> = { analytical: 0, intuitive: 0, consensus_seeking: 0, action_oriented: 0 };

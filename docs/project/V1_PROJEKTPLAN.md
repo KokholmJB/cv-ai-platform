@@ -91,6 +91,20 @@ Gate: alle M1-M6 gates grønne · feedback-flow virker · pilot-tjekliste godken
 | Stripe kompleks alene | Middel | Middel | Brug Stripe Checkout hosted |
 | Jobevaluering keyword-only | Middel | Høj | M2-gate kræver fit/mismatch forklaring |
 
+## UX/Design-spor (parallelt med M1-M3)
+
+### UX Fase 1 — Strukturelt fundament
+Gate: progressbar aktiv, system-look, næste-skridt logik,
+konsistent komponent-sprog. Skal være klar inden M1-gate.
+
+### UX Fase 2 — Dashboard og visualisering
+Gate: fuldt dashboard, profilstyrke-visualisering,
+motivationsmekanik, design system. Klar inden pilot.
+
+### UX Fase 3 — Engagement og retention
+Gate: accessibility-audit, hook-mekanikker, mobil-first.
+Klar efter pilot-feedback.
+
 ## Aktuel position
 Vi er i M1 — Profilfundament.
 

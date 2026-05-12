@@ -1,6 +1,12 @@
 # TASK_BOARD
 ## Current focus
 Commit og push af ekstra kapaciteter A/B/C.
+
+## UX/Design — Fase 1 (blokerer M1-gate)
+- Progressbar under interview tilbage og meningsfuld
+- Layout omstruktureret til system-look frem for hjemmeside
+- Næste-skridt logik tydelig på alle sider
+- Konsistent komponent-sprog
 ## P1 — Blokerer M1-gate (skal laves først)
 1. Indholdsvalidering af completionAnalysis-felter pr. scenarie
 2. Anti-keyword-validering pr. scenarie

@@ -27,3 +27,4 @@
 16. Autenticitetsprofil implementeres i interviewmotor og tests som V1-scope før M1-gate. (Godkendt Session 2, 2026-05-11)
 17. Fire manglende segment-scenarier tilføjes før M1-gate: executive, ledig, trade-transition, SOSU same-track. (Godkendt Session 2, 2026-05-11)
 18. Diversity/bias-aggregattest landes før M3 — ikke M1. (Godkendt Session 2, 2026-05-11)
+19. UX/Design etableres som selvstændigt leverancespor parallelt med motor- og profilarbejdet. UX Fase 1 blokerer M1-gate. Krav defineret i UX_DESIGN_REQUIREMENTS.md. (Godkendt Session 2, 2026-05-11)
