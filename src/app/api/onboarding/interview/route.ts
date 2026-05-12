@@ -2358,20 +2358,29 @@ function buildCompletionAnalysis({
   const experienceNorm = normalizeText(profileDraft.yearsExperience ?? "");
   const combinedNorm = [targetNorm, roleNorm, experienceNorm].join(" ");
 
+  // proxy for sustainabilityRisk === "high" — computed before sustainabilityRisk is available
+  const wipHighBurnoutRisk =
+    ((targetKind === "next_level" ? 1 : 0) +
+      (drainers.length >= 2 ? 1 : 0) +
+      (signals.possibleSelfMinimizingLanguage ? 1 : 0) +
+      (contradicting.length >= 1 ? 1 : 0)) >= 3;
   const workIntensityPreference: LifestyleProfileAnalysis["workIntensityPreference"] =
-    targetKind === "next_level" ||
+    (targetKind === "next_level" && !wipHighBurnoutRisk) ||
     ["intenst", "hoj fart", "ambitiost", "travlt"].some((k) => combinedNorm.includes(k))
       ? "high"
       : targetKind === "less_responsibility" ||
           targetKind === "same_track" ||
           targetKind === "same_track_better_conditions" ||
+          drainers.length >= 3 ||
+          wipHighBurnoutRisk ||
           ["ro ", "balance", "stabil", "trygt", "mindre pres", "lavere pres"].some((k) => combinedNorm.includes(k))
         ? "steady"
         : targetKind === "direction_change" ||
             targetKind === "product_transition" ||
-            targetKind === "specialist_track"
+            targetKind === "specialist_track" ||
+            (interviewState.coverage.workStyleFit && interviewState.evidenceCounts.noGoClarityCount >= 1)
           ? "moderate"
-          : "unclear";
+          : "moderate"; // prefer moderate over unclear as fallback when targetKind is known
 
   const workLocation: LifestyleProfileAnalysis["flexibilityNeeds"]["workLocation"] = ["remote", "hjemmefra",
     "hjemmearbejde"].some((k) => combinedNorm.includes(k))
