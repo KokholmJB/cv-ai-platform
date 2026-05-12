@@ -1,16 +1,21 @@
 # TASK_BOARD
 ## Current focus
-Commit og push af ekstra kapaciteter A/B/C.
+- evidenceStrengthVsGoal engine gap (P1 remaining)
+- P2: fire manglende segment-scenarier (executive, ledig, trade-transition, SOSU same-track)
+- P2: rekrutteringslogik-scenarier til dimension 5
+- P2: adfærdsmønster-validering dimension 2
 
 ## UX/Design — Fase 1 (blokerer M1-gate)
 - Progressbar under interview tilbage og meningsfuld
 - Layout omstruktureret til system-look frem for hjemmeside
 - Næste-skridt logik tydelig på alle sider
 - Konsistent komponent-sprog
+
 ## P1 — Blokerer M1-gate (skal laves først)
-1. Indholdsvalidering af completionAnalysis-felter pr. scenarie
+1. ~~Indholdsvalidering af completionAnalysis-felter pr. scenarie~~ ✅
 2. Anti-keyword-validering pr. scenarie
 3. Autenticitetsprofil implementeret i motor og tests
+4. evidenceStrengthVsGoal engine gap
 
 ## P2 — Kritisk før M1-gate
 4. Fire nye segment-scenarier: executive, ledig, trade-transition, SOSU same-track
@@ -34,6 +39,12 @@ Commit og push af ekstra kapaciteter A/B/C.
 - Autenticitetsprofil testet
 - Projektstyring godkender eksplicit
 ## Recently completed
+- workIntensityPreference inference styrket (unclear 2->0)
+- interviewReadiness vulnerabilities inference styrket (tom 5->0)
+- recruitmentFormatVulnerabilities inference styrket (none_identified 6->0)
+- behaviorUnderPressure inference styrket (unclear 6->2)
+- naturalTeamRole inference styrket (unclear 5->0)
+- Indholdsvalidering af completionAnalysis-felter implementeret (fieldSignals, genericString, diversityCheck)
 - Ekstra kapacitet A (hiddenStrengths), B (energyConditions), C (interviewReadiness) tilføjet til completionAnalysis
 - Kontomigration gennemført og verificeret
 - Transition completion gate implementeret og testet
