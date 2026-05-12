@@ -2459,7 +2459,22 @@ function buildCompletionAnalysis({
     interviewState.evidenceCounts.ownershipScopeCount +
     interviewState.evidenceCounts.concreteEvidenceCount;
 
-  const evidenceStrengthVsGoal: EvidenceProfileAnalysis["evidenceStrengthVsGoal"] =
+  const evidencePenalty =
+    ((targetKind === "product_transition" || targetKind === "direction_change") &&
+    interviewState.evidenceCounts.ownershipScopeCount < 2
+      ? 2
+      : 0) +
+    (targetKind === "next_level" && interviewState.evidenceCounts.resultEvidenceCount < 2 ? 2 : 0) +
+    (selfImageGapSeverity === "high" ? 1 : 0) +
+    (evidenceClassification.filter((e) => e.classification === "user_claim").length >= 4 ? 2 : 0) +
+    (profileModel.hypotheses.some(
+      (h) => h.key === "target_direction_stronger_than_proven_evidence" && h.unresolved,
+    )
+      ? 2
+      : 0) +
+    (profileModel.interpretations.some((i) => i.key === "direction_is_clearer_than_proof") ? 1 : 0);
+
+  let evidenceStrengthVsGoal: EvidenceProfileAnalysis["evidenceStrengthVsGoal"] =
     targetKind === "next_level"
       ? totalEvidenceScore >= 3
         ? "sufficient"
@@ -2485,6 +2500,9 @@ function buildCompletionAnalysis({
             : totalEvidenceScore >= 1
               ? "borderline"
               : "insufficient";
+  // apply penalty downgrades: target-relevance gap pushes result down
+  if (evidencePenalty >= 2 && evidenceStrengthVsGoal === "sufficient") evidenceStrengthVsGoal = "borderline";
+  if (evidencePenalty >= 3 && evidenceStrengthVsGoal === "borderline") evidenceStrengthVsGoal = "insufficient";
 
   const templatePhrases = ["foerste billede", "brugbart", "foreloebig", "evidence-aware"];
   const transferableStrengths: EvidenceProfileAnalysis["transferableStrengths"] = [
