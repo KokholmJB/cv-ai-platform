@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { CompletionComplexity, InterviewScenario, LoopFamily } from "./scenarios";
+import type { CompletionComplexity, FieldSignalExpectation, InterviewScenario, LoopFamily } from "./scenarios";
 
 type FocusArea =
   | "current_work_reality"
@@ -54,6 +54,7 @@ type CompleteResponse = {
     hypotheses?: unknown[];
     questionPriorities?: unknown[];
     communicationSignals?: Record<string, unknown>;
+    completionAnalysis?: Record<string, unknown>;
   };
   hypothesisSummary?: unknown[];
   uncertaintySummary?: unknown[];
@@ -89,6 +90,7 @@ type ScenarioResult = {
   failureReasons: string[];
   questions: string[];
   completionQuality: CompletionQualityReport | null;
+  completionAnalysisSnapshot: Record<string, unknown> | null;
 };
 
 type CompletionQualityReport = {
@@ -273,6 +275,77 @@ function countObjectSignals(value: unknown) {
   return Object.values(value).filter((item) => item !== null && item !== undefined && item !== "").length;
 }
 
+function validateFieldSignals(
+  completionAnalysis: Record<string, unknown>,
+  expectedFieldSignals: Record<string, FieldSignalExpectation | undefined>,
+): string[] {
+  const warnings: string[] = [];
+
+  for (const [fieldName, expectation] of Object.entries(expectedFieldSignals)) {
+    if (!expectation) continue;
+
+    const field = completionAnalysis[fieldName];
+
+    if (expectation.required && (field === undefined || field === null)) {
+      warnings.push(`field_signal_missing:${fieldName}`);
+      continue;
+    }
+
+    if (field === undefined || field === null) continue;
+
+    const fieldJson = JSON.stringify(field);
+
+    if (expectation.expectedPatterns && expectation.expectedPatterns.length > 0) {
+      if (!expectation.expectedPatterns.some((pattern) => pattern.test(fieldJson))) {
+        warnings.push(`field_signal_pattern_not_found:${fieldName}`);
+      }
+    }
+
+    if (expectation.forbiddenPatterns) {
+      for (const pattern of expectation.forbiddenPatterns) {
+        if (pattern.test(fieldJson)) {
+          warnings.push(`field_signal_forbidden_pattern:${fieldName}`);
+          break;
+        }
+      }
+    }
+
+    if (expectation.requiredSubfields) {
+      for (const subfield of expectation.requiredSubfields) {
+        if (Array.isArray(field)) {
+          if (field.length === 0) {
+            warnings.push(`field_signal_empty_subfield:${fieldName}:${subfield}`);
+          }
+        } else if (typeof field === "object") {
+          const subfieldValue = (field as Record<string, unknown>)[subfield];
+          if (
+            subfieldValue === undefined ||
+            subfieldValue === null ||
+            subfieldValue === "" ||
+            (Array.isArray(subfieldValue) && subfieldValue.length === 0)
+          ) {
+            warnings.push(`field_signal_empty_subfield:${fieldName}:${subfield}`);
+          }
+        }
+      }
+    }
+
+    if (expectation.forbiddenExactValues) {
+      if (typeof field === "string" && expectation.forbiddenExactValues.includes(field)) {
+        warnings.push(`field_signal_forbidden_value:${fieldName}:${field}`);
+      } else if (typeof field === "object" && !Array.isArray(field)) {
+        for (const [key, val] of Object.entries(field as Record<string, unknown>)) {
+          if (typeof val === "string" && expectation.forbiddenExactValues.includes(val)) {
+            warnings.push(`field_signal_forbidden_value:${fieldName}.${key}:${val}`);
+          }
+        }
+      }
+    }
+  }
+
+  return warnings;
+}
+
 function getQualityThresholds(complexity: CompletionComplexity) {
   switch (complexity) {
     case "complex":
@@ -390,6 +463,61 @@ function analyzeCompletionQuality({
     qualityWarnings.push("progress_100_with_thin_profile");
   }
 
+  const completionAnalysis = response.profileModel?.completionAnalysis ?? null;
+
+  if (completionAnalysis && expectations.expectedFieldSignals) {
+    qualityWarnings.push(
+      ...validateFieldSignals(
+        completionAnalysis,
+        expectations.expectedFieldSignals as Record<string, FieldSignalExpectation | undefined>,
+      ),
+    );
+  }
+
+  if (completionAnalysis) {
+    const genericForbidden = ["unclear", "none_identified"];
+
+    for (const [fieldName, fieldValue] of Object.entries(completionAnalysis)) {
+      // Empty-content-check: object fields where every subfield is null/empty
+      if (fieldValue !== null && typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+        const vals = Object.values(fieldValue as Record<string, unknown>);
+        if (
+          vals.length > 0 &&
+          vals.every(
+            (v) => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0),
+          )
+        ) {
+          qualityWarnings.push(`empty_field_content:${fieldName}`);
+        }
+      }
+
+      // Generic-string-check: forbidden singleton values at field or one level deep
+      if (typeof fieldValue === "string" && genericForbidden.includes(fieldValue)) {
+        qualityWarnings.push(`generic_string_value:${fieldName}:${fieldValue}`);
+      } else if (
+        Array.isArray(fieldValue) &&
+        fieldValue.length === 1 &&
+        typeof fieldValue[0] === "string" &&
+        genericForbidden.includes(fieldValue[0])
+      ) {
+        qualityWarnings.push(`generic_string_value:${fieldName}:${fieldValue[0]}`);
+      } else if (fieldValue !== null && typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+        for (const [, subVal] of Object.entries(fieldValue as Record<string, unknown>)) {
+          if (typeof subVal === "string" && genericForbidden.includes(subVal)) {
+            qualityWarnings.push(`generic_string_value:${fieldName}:${subVal}`);
+          } else if (
+            Array.isArray(subVal) &&
+            subVal.length === 1 &&
+            typeof subVal[0] === "string" &&
+            genericForbidden.includes(subVal[0])
+          ) {
+            qualityWarnings.push(`generic_string_value:${fieldName}:${subVal[0]}`);
+          }
+        }
+      }
+    }
+  }
+
   return {
     facts,
     interpretations,
@@ -441,6 +569,7 @@ async function runScenario(
   let finalProgress = 0;
   let turns = 0;
   let completionQuality: CompletionQualityReport | null = null;
+  let completionAnalysisSnapshot: Record<string, unknown> | null = null;
 
   for (let turn = 0; turn < (scenario.maxTurns ?? defaultMaxTurns); turn += 1) {
     const lastUserAnswer =
@@ -503,6 +632,8 @@ async function runScenario(
       for (const warning of completionQuality.qualityWarnings) {
         issues.push({ level: "warn", reason: warning });
       }
+
+      completionAnalysisSnapshot = result.profileModel?.completionAnalysis ?? null;
 
       const summaryText = JSON.stringify({
         profileSummary: result.profileSummary,
@@ -582,6 +713,7 @@ async function runScenario(
     failureReasons: [...new Set(failureReasons)],
     questions,
     completionQuality,
+    completionAnalysisSnapshot,
   };
 }
 
@@ -636,6 +768,31 @@ function printSummary(results: ScenarioResult[]) {
   console.log(`Top repeated reasons: ${topReasons.length ? topReasons.join(", ") : "none"}`);
 }
 
+function runDiversityCheck(results: ScenarioResult[]) {
+  const fieldValueCounts = new Map<string, Map<string, number>>();
+
+  for (const result of results) {
+    if (!result.completionAnalysisSnapshot) continue;
+
+    for (const [field, value] of Object.entries(result.completionAnalysisSnapshot)) {
+      const serialized = JSON.stringify(value);
+      if (!fieldValueCounts.has(field)) fieldValueCounts.set(field, new Map());
+      const valueCounts = fieldValueCounts.get(field)!;
+      valueCounts.set(serialized, (valueCounts.get(serialized) ?? 0) + 1);
+    }
+  }
+
+  for (const [field, valueCounts] of fieldValueCounts.entries()) {
+    for (const [value, count] of valueCounts.entries()) {
+      if (count >= 5) {
+        console.log(
+          `[diversity] Field "${field}" has identical value across ${count} scenarios: ${value.slice(0, 120)}`,
+        );
+      }
+    }
+  }
+}
+
 async function main() {
   loadLocalEnv();
 
@@ -656,6 +813,7 @@ async function main() {
   }
 
   printSummary(results);
+  runDiversityCheck(results);
 
   if (results.some((result) => result.status === "FAIL")) {
     process.exitCode = 1;

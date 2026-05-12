@@ -17,6 +17,14 @@ export type LoopFamily =
 
 export type CompletionComplexity = "simple" | "moderate" | "complex";
 
+export type FieldSignalExpectation = {
+  required?: boolean;
+  requiredSubfields?: string[];
+  expectedPatterns?: RegExp[];
+  forbiddenPatterns?: RegExp[];
+  forbiddenExactValues?: string[];
+};
+
 export type CompletionQualityExpectations = {
   complexity: CompletionComplexity;
   suspiciousEarlyTurns?: number;
@@ -24,6 +32,16 @@ export type CompletionQualityExpectations = {
   requireHypotheses?: boolean;
   expectedConcepts?: string[];
   minimumMatchedConcepts?: number;
+  expectedFieldSignals?: {
+    behaviorProfile?: FieldSignalExpectation;
+    lifestyleProfile?: FieldSignalExpectation;
+    recruitmentLogic?: FieldSignalExpectation;
+    hiddenStrengths?: FieldSignalExpectation;
+    energyConditions?: FieldSignalExpectation;
+    interviewReadiness?: FieldSignalExpectation;
+    evidenceProfile?: FieldSignalExpectation;
+    communicationProfile?: FieldSignalExpectation;
+  };
 };
 
 export type InterviewScenario = {
@@ -81,6 +99,10 @@ export const interviewScenarios: InterviewScenario[] = [
       suspiciousEarlyTurns: 2,
       expectedConcepts: ["lager", "logistik", "stabile", "leder"],
       minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        lifestyleProfile: { forbiddenExactValues: ["unclear"] },
+        hiddenStrengths: { required: true, expectedPatterns: [/\[.+\]/] },
+      },
     },
   },
   {
@@ -206,6 +228,10 @@ export const interviewScenarios: InterviewScenario[] = [
       suspiciousEarlyTurns: 3,
       expectedConcepts: ["specialist", "data", "personaleansvar"],
       minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: { forbiddenExactValues: ["upward"], expectedPatterns: [/specialist/i] },
+        energyConditions: { requiredSubfields: ["peaksAt"] },
+      },
     },
   },
   {
@@ -241,6 +267,10 @@ export const interviewScenarios: InterviewScenario[] = [
       requireHypotheses: true,
       expectedConcepts: ["product", "roadmap", "backlog", "koordinering", "prioritering"],
       minimumMatchedConcepts: 3,
+      expectedFieldSignals: {
+        evidenceProfile: { forbiddenExactValues: ["sufficient"] },
+        interviewReadiness: { requiredSubfields: ["vulnerabilities"] },
+      },
     },
   },
   {
@@ -336,6 +366,11 @@ export const interviewScenarios: InterviewScenario[] = [
       requireHypotheses: true,
       expectedConcepts: ["mindre ansvar", "lavere pres", "balance", "senior"],
       minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: { forbiddenExactValues: ["upward"] },
+        lifestyleProfile: { forbiddenExactValues: ["high"] },
+        energyConditions: { requiredSubfields: ["strugglesAt"] },
+      },
     },
   },
   {
@@ -371,6 +406,10 @@ export const interviewScenarios: InterviewScenario[] = [
       requireHypotheses: true,
       expectedConcepts: ["sygeplejerske", "health tech", "skifte", "koordinering", "support"],
       minimumMatchedConcepts: 3,
+      expectedFieldSignals: {
+        evidenceProfile: { requiredSubfields: ["transferableStrengths"] },
+        energyConditions: { requiredSubfields: ["strugglesAt"] },
+      },
     },
   },
 ];

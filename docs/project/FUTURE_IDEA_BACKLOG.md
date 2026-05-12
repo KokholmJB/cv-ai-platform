@@ -6,6 +6,51 @@ Denne fil samler vigtige idéer uden for aktiv V1-scope, så produktretning og f
 ## Styrende regel
 Fremtidige idéer må ikke overstyre V1-wedgen: bedre jobbeslutninger, seriøst profilfundament og stærkere målrettede ansøgninger.
 
+## Post-V1 produkter
+
+### AI Agent Udviklings- og Projektplatform
+- Hvad: Et selvstændigt program der organiserer projekter og driver udvikling via AI-agenter — bygget og testet før satellit-produkterne.
+- Formål: Platformen bygger produkterne. Satellit-produkterne bliver den første test af om platformen virker.
+- Projektoverblik:
+  - Hvert projekt åbner med visuelt overblik over status, modeller og relevante projektværktøjer
+  - Projekter oprettes med en grundidé der bearbejdes i et udviklingsmodul
+- Udviklingsmodul:
+  - Bruger skriver grundidé
+  - AI-rådgiver/research-agent hjælper med at konkretisere idéen
+  - Når idéen er moden overføres den til et projekt
+  - Systemet opsætter automatisk projektstruktur, dokumenter og agenter
+- AI Agent-hierarki:
+  - Styregruppe (øverste lag): brugeren kommunikerer med gruppen som helhed; styregruppen består af relevante AI-agenter der deltager i chatten; brugeren er den der endeligt godkender ved gates
+  - Per projekt: AI projektleder-agent; under denne specialiserede agenter — research, projektstyring, design, kode, UX osv.
+  - Inspireret af JobPilot-arbejdsstrukturen men automatiseret: systemet kører selv mellem gates uden brugerindblanding; ved hver fase-afslutning gate der tages op i styregruppen; brugeren godkender før næste fase starter
+- Rækkefølge:
+  1. Byg AI Agent Udviklings- og Projektplatform
+  2. Test platformen ved at lade den bygge satellit-produkterne
+  3. Hvis det virker — platformen er valideret og klar til brug
+- Hvornår genovervejes dette: Når JobPilot V1 er lanceret og kerneværdien er valideret.
+- Vigtig regel: Dette ændrer ikke V1-fokus. Ingenting her bygges før JobPilot V1 er færdigt.
+
+### Satellit-produkter
+- Hvad: Selvstændige mini-sites eller lette produkter der adresserer ét specifikt jobsøger-behov uden fuld JobPilot-onboarding.
+- Strategisk formål:
+  - Lav friktion — brugeren behøver ikke oprette fuld profil for at prøve produktet
+  - Bred top-of-funnel — lavtærskel-indgange der kan konvertere til JobPilot-kerne
+  - A/B-laboratorium — teste hvad der resonerer bredt vs. hos seriøse jobsøgere
+  - Komplementær, ikke konkurrerende — kernen forbliver det primære produkt
+  - Potentiel selvstændig værdiskabelse — nogle satellit-produkter kan have standalone-nytte
+- Mulige satellit-indgange:
+  - Jobmatch-site: brugeren indsætter CV + jobopslag → hurtig fit-score og gaps
+  - CV-oversætter: konverterer CV til mere målrettet dansk format
+  - Ansøgningsgenerator: genererer ansøgning fra CV + jobopslag uden fuld profil
+  - CV-kritik/vurdering: struktureret feedback på et CV
+  - Karriere-retningstest: hurtig afklaring af jobretning og -niveau
+- Feedback- og målingslag:
+  - Niveau 1: Satellit-bruger → konverterer til JobPilot-kerne? (top-of-funnel effektivitet)
+  - Niveau 2: Satellit-output kvalitet vs. JobPilot-kerne-output kvalitet (produktværdi-validering)
+- Arkitektur-princip: JobPilot Core er altid det dybeste produkt; satellit-sites peger på samme backend
+- Vigtig regel: Dette ændrer ikke V1-fokus. Ingenting her bygges før JobPilot V1 er færdigt.
+- Hvornår genovervejes dette: Efter V1-lancering med brugerdata der viser hvad der driver acquisition og conversion.
+
 ## Later
 ### Feedback-loop fra jobansøgninger
 - Hvad: Brugeren kan logge udfald pr. job: applied, no reply, rejection, interview, senere runder og evt. employer feedback.
