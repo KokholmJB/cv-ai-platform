@@ -2225,6 +2225,7 @@ function buildCompletionAnalysis({
     seeks_support: 0,
     withdraws: 0,
   };
+  // primary targetKind and evidence signals
   if (targetKind === "next_level") bupScores.takes_control += 3;
   if (interviewState.evidenceCounts.ownershipScopeCount >= 2 && interviewState.evidenceCounts.resultEvidenceCount >= 2)
     bupScores.takes_control += 2;
@@ -2236,8 +2237,32 @@ function buildCompletionAnalysis({
   if (selfReferences === "distancing_we") bupScores.seeks_support += 1;
   if (interviewState.evidenceCounts.noGoClarityCount >= 1 && bupScores.takes_control === 0) bupScores.withdraws += 2;
   if (targetKind === "less_responsibility") bupScores.withdraws += 1;
+  // supplementary targetKind signals
+  if (targetKind === "next_level") bupScores.takes_control += 1;
+  if (targetKind === "less_responsibility") bupScores.seeks_support += 1;
+  if (targetKind === "same_track_better_conditions") bupScores.seeks_support += 1;
+  // interpretation text scan for pressure/response language
+  const bupInterpStatements = profileModel.interpretations.map((i) => i.statement.toLowerCase());
+  if (["pres", "stress", "deadline", "krise"].some((w) => bupInterpStatements.some((s) => s.includes(w))))
+    bupScores.problem_solver += 1;
+  if (["kontrol", "beslutter", "tager styringen"].some((w) => bupInterpStatements.some((s) => s.includes(w))))
+    bupScores.takes_control += 1;
+  if (["hjælp", "støtte", "sparrer", "rådfører"].some((w) => bupInterpStatements.some((s) => s.includes(w))))
+    bupScores.seeks_support += 1;
+  if (["trækker sig", "undgår", "holder lav profil"].some((w) => bupInterpStatements.some((s) => s.includes(w))))
+    bupScores.withdraws += 1;
+  // hypothesis key signals
+  if (profileModel.hypotheses.some((h) => h.key === "leadership_vs_coordination_scope")) bupScores.takes_control += 1;
+  if (profileModel.hypotheses.some((h) => h.key === "result_strength")) bupScores.problem_solver += 1;
+  if (profileModel.hypotheses.some((h) => h.key === "direction_is_clearer_than_proof")) bupScores.withdraws += 1;
   const bupSorted = (Object.entries(bupScores) as [Exclude<BUP, "unclear">, number][]).sort((a, b) => b[1] - a[1]);
-  const behaviorUnderPressure: BUP = bupSorted[0][1] >= 2 ? bupSorted[0][0] : "unclear";
+  // prefer reasonable inference over "unclear" unless signals are genuinely contradictory (tied at top)
+  const behaviorUnderPressure: BUP =
+    bupSorted[0][1] >= 2
+      ? bupSorted[0][0]
+      : bupSorted[0][1] === 1 && bupSorted[1][1] === 0
+        ? bupSorted[0][0]
+        : "unclear";
 
   type NTR = BehaviorProfileAnalysis["naturalTeamRole"];
   const ntrScores: Record<Exclude<NTR, "unclear">, number> = {
