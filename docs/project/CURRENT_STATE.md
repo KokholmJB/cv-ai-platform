@@ -22,7 +22,14 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - communicationProfile:none_identified 6->0
 - interviewReadiness:vulnerabilities tom 5->0
 - workIntensityPreference:unclear 2->0
+## Arkitekturbeslutning (2026-05-12)
+- Fire-lags AI pipeline arkitektur godkendt — erstatter regelbaseret completionAnalysis
+- M2 dedikeres til pipeline migration + korrektion + persistence; jobanbefalingsmodel flyttes til M3
+- Persistence og korrektion er nu V1-scope (bryder no-persistence-reglen bevidst)
+- Autenticitetsprofil er Lag 3-output og forudsætning for M3
+
 ## Næste workstream
+- Fase 0: benchmark-suite (5-10 scenarier) som forudsætning for pipeline migration
 - P1 remaining: evidenceStrengthVsGoal engine gap
 - P2: fire manglende segment-scenarier (executive, ledig, trade-transition, SOSU same-track)
 - P2: rekrutteringslogik-scenarier til dimension 5

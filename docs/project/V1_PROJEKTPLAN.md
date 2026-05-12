@@ -13,17 +13,17 @@ Et funktionelt system som rigtige brugere betaler for at bruge. Ledige danske jo
 
 ## Milepælsplan — 8 uger
 
-### M1 — Uge 1-2: Profilfundament færdigt
-Interviewmotor dækker alle fem profildimensioner. Profile view model og mapping-lag færdigt. Personlig og teknisk profil adskilt.
-Gate: test:interview-scenarios 0 WARN · test:setup-ux-review 0 WARN/FAIL · build grøn
+### M1 — Uge 1-2: Profilfundament + Fase 0 arkitektur-forudsætninger
+Interviewmotor dækker alle fem profildimensioner. Profile view model og mapping-lag færdigt. Personlig og teknisk profil adskilt. Benchmark-suite (5-10 scenarier) klar. Vendor-abstraktion og korrektionskontrakt designet.
+Gate: test:interview-scenarios 0 WARN · test:setup-ux-review 0 WARN/FAIL · build grøn · benchmark-suite klar · autenticitetsprofil implementeret
 
-### M2 — Uge 2-3: Jobanbefalingsmodel
-Brugeren kan indsætte et jobopslag og få: søg / måske / ikke indsatsen værd. Forklaring af fit og mismatch. Fire evalueringssvar implementeret.
-Gate: jobevaluering fungerer på mindst 3 segmenter · ingen keyword-only matching
+### M2 — Uge 2-3: Fire-lags AI pipeline migration + korrektion + persistence
+Fire-lags AI pipeline erstatter regelbaseret completionAnalysis. Lag 1-4 implementeret og valideret mod benchmark. Korrektion (bruger kan rette AI-fortolkninger) implementeret. Persistence for profil og korrektionshistorik klar.
+Gate: pipeline valideret mod benchmark · korrektion virker end-to-end · profil gemmes korrekt · ingen regression på eksisterende scenarietest
 
-### M3 — Uge 3-4: CV og ansøgningsgenerering
-CV-generering med 2-3 layouts målrettet konkret job. Ansøgningsgenerering med troværdig motivation og tone. Output bygger på reel evidens.
-Gate: output lyder som brugeren · ingen opfundet erfaring · mindst 2 layouts virker
+### M3 — Uge 3-4: Jobanbefalingsmodel + CV + ansøgningsgenerering
+Brugeren kan indsætte et jobopslag og få: søg / måske / ikke indsatsen værd. Forklaring af fit og mismatch. CV-generering med 2-3 layouts målrettet konkret job. Ansøgningsgenerering med troværdig motivation og tone. Output bygger på reel evidens og autenticitetsprofil (Lag 3).
+Gate: jobevaluering fungerer på mindst 3 segmenter · ingen keyword-only matching · output lyder som brugeren · ingen opfundet erfaring · mindst 2 layouts virker
 
 ### M4 — Uge 4-5: Jobtracker
 Brugeren kan logge job de søger, status og noter. Simpelt og funktionelt.

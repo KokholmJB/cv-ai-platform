@@ -5,6 +5,14 @@
 - P2: rekrutteringslogik-scenarier til dimension 5
 - P2: adfærdsmønster-validering dimension 2
 
+## Arkitektur-migration Fase 0
+Forudsætninger der skal landes inden pipeline migration kan starte (M2):
+- [ ] Benchmark-suite: 5-10 scenarier der måler Lag 2-output kvalitativt og kvantitativt
+- [ ] Vendor-abstraktion: interface-lag der skjuler model-udbyder fra forretningslogik
+- [ ] Persistence-model: database-design for profil og korrektionshistorik
+- [ ] Korrektionskontrakt: API-design for bruger-korrektion af AI-fortolkninger
+- [ ] Modelmix-konfiguration: Opus-tier til Lag 2-3-4, hurtig tier til Lag 1
+
 ## UX/Design — Fase 1 (blokerer M1-gate)
 - Progressbar under interview tilbage og meningsfuld
 - Layout omstruktureret til system-look frem for hjemmeside
