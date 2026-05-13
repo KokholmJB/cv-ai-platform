@@ -2178,8 +2178,12 @@ function buildCompletionAnalysis({
     rlScores.documented_results += 1;
 
   // cv_and_experience
-  if (targetKind === "same_track" || targetKind === "same_track_better_conditions") rlScores.cv_and_experience += 3;
-  if (interviewState.evidenceCounts.concreteEvidenceCount >= 2) rlScores.cv_and_experience += 1;
+  if (targetKind === "same_track") rlScores.cv_and_experience += 3;
+  if (targetKind === "same_track_better_conditions") rlScores.cv_and_experience += 3;
+  if (targetKind === "same_track" && interviewState.evidenceCounts.concreteEvidenceCount >= 2)
+    rlScores.cv_and_experience += 1;
+  if (targetKind === "same_track_better_conditions" && interviewState.evidenceCounts.concreteEvidenceCount >= 2)
+    rlScores.cv_and_experience += 2;
   if (targetKind === "direction_change" || targetKind === "product_transition") rlScores.cv_and_experience += 1;
 
   // academic_and_structured
