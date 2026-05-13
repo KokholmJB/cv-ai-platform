@@ -102,6 +102,7 @@ export const interviewScenarios: InterviewScenario[] = [
       expectedFieldSignals: {
         lifestyleProfile: { forbiddenExactValues: ["unclear"] },
         hiddenStrengths: { required: true, expectedPatterns: [/\[.+\]/] },
+        recruitmentLogic: { required: true, expectedPatterns: [/cv_and_experience/] },
       },
     },
   },
@@ -198,6 +199,9 @@ export const interviewScenarios: InterviewScenario[] = [
       requireUncertainties: true,
       expectedConcepts: ["cold outreach", "customer success", "support", "kunder"],
       minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        recruitmentLogic: { required: true, expectedPatterns: [/personality_and_culture|chemistry_and_fit/] },
+      },
     },
   },
   {
@@ -231,6 +235,7 @@ export const interviewScenarios: InterviewScenario[] = [
       expectedFieldSignals: {
         behaviorProfile: { forbiddenExactValues: ["upward"], expectedPatterns: [/specialist/i] },
         energyConditions: { requiredSubfields: ["peaksAt"] },
+        recruitmentLogic: { required: true, forbiddenExactValues: ["chemistry_and_fit"] },
       },
     },
   },
@@ -302,6 +307,10 @@ export const interviewScenarios: InterviewScenario[] = [
       requireHypotheses: true,
       expectedConcepts: ["teamleder", "personaleansvar", "ledelsesansvar"],
       minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        recruitmentLogic: { required: true, forbiddenExactValues: ["chemistry_and_fit"] },
+        behaviorProfile: { forbiddenExactValues: ["less_responsibility"] },
+      },
     },
   },
   {
@@ -409,6 +418,181 @@ export const interviewScenarios: InterviewScenario[] = [
       expectedFieldSignals: {
         evidenceProfile: { requiredSubfields: ["transferableStrengths"] },
         energyConditions: { requiredSubfields: ["strugglesAt"] },
+        behaviorProfile: { expectedPatterns: [/lateral/] },
+      },
+    },
+  },
+  {
+    id: "trade-transition",
+    label: "Trade worker transitioning away from physical work",
+    profileDraft: {
+      name: "Brian",
+      currentRole: "Elektriker",
+      yearsExperience:
+        "16 aar som elektriker med installation, serviceopgaver, fejlfinding, kundekontakt og tilbudsgivning.",
+      targetDirection:
+        "Jeg vil vaek fra det fysiske arbejde paa grund af kroppen og vil hellere arbejde indendoers med koordinering, support eller teknisk raadgivning i en relateret branche.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: ["leadership", "management"],
+    scriptedAnswers: {
+      default:
+        "Jeg vil vaek fra det fysiske arbejde, ikke ud af branchen. Jeg er stadig stolt af mit fag og vil gerne bruge min viden, men i en rolle der ikke kraever at jeg er paa knae eller paa stige hele dagen.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder der vil have mig paa gulvet igen. Et godt match er koordinering, tilbudsgivning, support eller indkaeb i el- eller installationsbranchen.",
+        current_work_reality:
+          "Min hverdag er installation, serviceopgaver, fejlfinding, kundekontakt og tilbudsberegning. Kroppen begynder at saette graenser.",
+        resultEvidence:
+          "Jeg har vaeret god til at vejlede nye kollegaer og laere dem de tekniske detaljer, fordi jeg ser moenstrene i fejlene hurtigt.",
+      },
+    },
+    expectedSignals: [
+      "physical limitation signal",
+      "trade knowledge transferable",
+      "indoor role preference",
+      "not management",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["elektriker", "koordinering", "indendoers", "fysisk"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        evidenceProfile: { requiredSubfields: ["transferableStrengths"] },
+        lifestyleProfile: { forbiddenExactValues: ["high"] },
+      },
+    },
+  },
+  {
+    id: "sosu-same-track",
+    label: "SOSU worker wanting same track with better conditions",
+    profileDraft: {
+      name: "Tina",
+      currentRole: "SOSU-assistent",
+      yearsExperience:
+        "10 aar med personlig pleje, medicinhaandtering, dokumentation, koordinering og taetkontakt med borgere og paaroerende.",
+      targetDirection:
+        "Jeg vil blive i omsorgsarbejdet, men jeg soeger dagvagter, ingen nattevagter og roller med mindre fysisk belaestning.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["leadership", "management", "career_change"],
+    scriptedAnswers: {
+      default:
+        "Jeg vil stadig arbejde med omsorg og borgere, det giver mig mening. Men jeg kan ikke fortsaette med nattevagter og det tunge fysiske arbejde. Jeg soeger dagvagter og en lettere variant inden for samme felt.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder med nattevagter, tung plejeafdeling og hoejt fysisk pres. Et godt match er en dagafdeling, aktivitetsmedarbejder, lettere klinisk arbejde eller administrativ rolle i omsorg.",
+        current_work_reality:
+          "Jeg planlaeeger og udforer personlig pleje, passer nattevagter, haandterer medicin og dokumenterer forloeb for borgere i aeldreplejen.",
+        resultEvidence:
+          "Jeg hjalp med at forbedre overleveringerne mellem vagterne, saa vigtig information ikke gik tabt og borgerne fik bedre kontinuitet.",
+      },
+    },
+    expectedSignals: [
+      "care sector commitment",
+      "workload reduction not career change",
+      "schedule preference",
+      "not career change",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      expectedConcepts: ["SOSU", "omsorg", "dagvagter", "nattevagter"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        lifestyleProfile: { forbiddenExactValues: ["high"] },
+      },
+    },
+  },
+  {
+    id: "executive-transition",
+    label: "Senior executive stepping back deliberately",
+    profileDraft: {
+      name: "Claus",
+      currentRole: "Direktoer",
+      yearsExperience:
+        "22 aar med topledelse, bestyrelsesarbejde, strategisk udvikling og ledelse af store organisationer med 100 eller flere medarbejdere.",
+      targetDirection:
+        "Jeg vil bevidst ned i tempo og ansvar. Jeg soeger en raadgiverrolle, bestyrelsespost eller en fokuseret ekspertrolle, ikke endnu et direktoer- eller toplederjob.",
+    },
+    intendedDirectionType: "less_responsibility",
+    expectedDoNotAssume: ["more_responsibility", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Jeg vil ikke have endnu et stort direktoer-job. Jeg vil bruge min erfaring som raadgiver, bestyrelsesmedlem eller specialist uden det operationelle ansvar. Det er et aktivt valg, ikke en nedtur.",
+      byFamily: {
+        responsibility:
+          "Jeg har haft det fulde ansvar for organisationer med store budgetter og mange medarbejdere. Nu vil jeg traede et skridt tilbage fra den operationelle byrde og bidrage paa en anden maade.",
+        mismatch_risk:
+          "Et daarligt match er roller der kraever jeg er den oeverste ansvarlige i den daglige drift. Et godt match er raadgivning, bestyrelsesrollen eller strategisk ekspertbistand.",
+        resultEvidence:
+          "Et konkret bidrag var en turnaround af en organisation i krise, der endte med vaekst og stabilitet tre aar efter.",
+      },
+    },
+    expectedSignals: [
+      "leadership legacy",
+      "advisory preference",
+      "deliberate deceleration",
+      "not operational leadership",
+    ],
+    loopFamiliesToWatch: ["responsibility", "mismatch_risk", "resultEvidence"],
+    completionQuality: {
+      complexity: "complex",
+      suspiciousEarlyTurns: 4,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["direktoer", "raadgiver", "bestyrelse", "ansvar"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: { forbiddenExactValues: ["upward"] },
+        lifestyleProfile: { forbiddenExactValues: ["high"] },
+      },
+    },
+  },
+  {
+    id: "job-seeker-gap",
+    label: "Job seeker with employment gap",
+    profileDraft: {
+      name: "Rasmus",
+      currentRole: "Projektkoordinator, ledig i 11 maaneder",
+      yearsExperience:
+        "11 aar med projektkoordinering, interessentstyring, dokumentation og intern kommunikation. Ledigt siden virksomhedslukning.",
+      targetDirection:
+        "Jeg vil tilbage i arbejde i en lignende koordinerings- eller administrativ rolle, helst i en stoerre og mere stabil virksomhed.",
+    },
+    intendedDirectionType: "same_track",
+    expectedDoNotAssume: ["leadership", "promotion", "career_change"],
+    scriptedAnswers: {
+      default:
+        "Jeg har vaeret ledig i knap et aar fordi virksomheden lukkede, ikke pga. performance. Jeg er klar til at komme tilbage og soeger det samme type arbejde som jeg har 11 aars erfaring med.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder der er skeptiske over for, at et ledighedsgab kan skyldes omstaendigheder. Et godt match vurderer min faktiske erfaring og hvad jeg kan.",
+        current_work_reality:
+          "Inden ledighed var min hverdag projektkoordinering, interessentstyring, dokumentation, referater, opfoelgning og intern kommunikation.",
+        resultEvidence:
+          "I mit seneste job koordinerede jeg et flytningsprojekt der gik i maal til tiden og inden for budgettet med tre afdelinger involveret.",
+      },
+    },
+    expectedSignals: [
+      "gap explanation",
+      "reentry confidence",
+      "previous competence intact",
+      "same-track target",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["ledig", "koordinering", "projekt", "virksomhed"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        interviewReadiness: { requiredSubfields: ["vulnerabilities"] },
       },
     },
   },

@@ -26,9 +26,11 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 4. evidenceStrengthVsGoal engine gap
 
 ## P2 — Kritisk før M1-gate
-4. Fire nye segment-scenarier: executive, ledig, trade-transition, SOSU same-track
-5. Rekrutteringslogik-scenarier til dimension 5
-6. Adfærdsmønster-validering dimension 2
+4. ~~Fire nye segment-scenarier: executive, ledig, trade-transition, SOSU same-track~~ ✅
+5. ~~Rekrutteringslogik-scenarier til dimension 5~~ ✅ (field signals tilføjet 4 scenarier)
+6. ~~Adfærdsmønster-validering dimension 2~~ ✅ (ambitionProfile + naturalTeamRole field signals tilføjet)
+7. recruitmentLogic engine gap: warehouse-worker returnerer ikke cv_and_experience (ny P2)
+8. interviewReadiness:vulnerabilities tom for job-seeker-gap (ny P2)
 
 ## P3 — Venter til M2
 7. Adaptiv kommunikation differentialtest
@@ -47,6 +49,9 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 - Autenticitetsprofil testet
 - Projektstyring godkender eksplicit
 ## Recently completed
+- Fire nye segment-scenarier tilføjet: trade-transition, sosu-same-track, executive-transition, job-seeker-gap
+- recruitmentLogic field signals tilføjet til 4 scenarier (people-manager, specialist-expert, sales-customer-facing, same-role-warehouse-worker)
+- behaviorProfile ambitionProfile + naturalTeamRole field signals tilføjet til 4 scenarier (senior-less-responsibility, people-manager, specialist-expert, career-changer)
 - workIntensityPreference inference styrket (unclear 2->0)
 - interviewReadiness vulnerabilities inference styrket (tom 5->0)
 - recruitmentFormatVulnerabilities inference styrket (none_identified 6->0)

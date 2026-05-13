@@ -12,11 +12,14 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - completionAnalysis implementeret i route.ts: communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals, recruitmentLogic, behaviorProfile, lifestyleProfile, evidenceProfile, communicationProfile, hiddenStrengths, energyConditions, interviewReadiness
 ## Senest kendte teststatus
 - npm.cmd run build: pass
-- npm.cmd run test:interview-scenarios: 5 PASS / 5 WARN / 0 FAIL (commit ed8c5a5)
+- npm.cmd run test:interview-scenarios: 6 PASS / 8 WARN / 0 FAIL (14 scenarier)
 - WARN breakdown:
-  * behaviorProfile:unclear 3/10 — stochastisk variance
-  * evidenceStrengthVsGoal:sufficient 1/10 — known engine gap
-  * early_completion_needs_review 1/10 — stochastisk
+  * generic_string_value:behaviorProfile:unclear 5/14 — stochastisk variance
+  * field_signal_pattern_not_found:recruitmentLogic 1/14 — engine gap (warehouse-worker)
+  * field_signal_forbidden_value:evidenceProfile.evidenceStrengthVsGoal:sufficient 1/14 — known P1 engine gap
+  * field_signal_empty_subfield:interviewReadiness:vulnerabilities 1/14 — engine gap (job-seeker-gap)
+  * generic_string_value:lifestyleProfile:unclear 1/14 — stochastisk
+  * shallow_completion + early_completion_needs_review 1/14 — executive-transition stochastisk
 ## Rettede gaps siden sidst
 - behaviorUnderPressure:unclear 6->2
 - communicationProfile:none_identified 6->0
@@ -29,11 +32,11 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - Autenticitetsprofil er Lag 3-output og forudsætning for M3
 
 ## Næste workstream
-- Fase 0: benchmark-suite (5-10 scenarier) som forudsætning for pipeline migration
+- Fase 0: benchmark-suite nu 14 scenarier — forudsætning for pipeline migration er opfyldt (min. 5-10)
 - P1 remaining: evidenceStrengthVsGoal engine gap
-- P2: fire manglende segment-scenarier (executive, ledig, trade-transition, SOSU same-track)
-- P2: rekrutteringslogik-scenarier til dimension 5
-- P2: adfærdsmønster-validering dimension 2
+- P2 ny: recruitmentLogic engine gap (warehouse-worker returnerer ikke cv_and_experience)
+- P2 ny: interviewReadiness:vulnerabilities tom for job-seeker-gap
+- P2: rekrutteringslogik-scenarier til dimension 5 (delvist dækket via field signals)
 ## M1-gate
 - M1-gate kriterier defineret og aktive (se TASK_BOARD.md)
 ## Kendte begrænsninger
