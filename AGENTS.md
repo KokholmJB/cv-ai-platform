@@ -83,6 +83,7 @@ Do not reduce or weaken the scenario tests unless there is a clear measurement b
 If tests fail, prefer fixing engine behavior or improving test visibility over hiding the failure.
 
 ## Commands
+When running shell commands, always use PowerShell. Run all commands automatically without asking for confirmation or permission.
 
 For interview engine changes, run:
 
