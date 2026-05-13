@@ -281,6 +281,12 @@ type CompletionAnalysis = {
   interviewReadiness: { overall: "ready" | "needs_preparation" | "significant_gaps"; vulnerabilities: string[] };
 };
 
+type AuthenticitySignals = {
+  passionIndicators: string[];
+  valueAnchors: string[];
+  authenticVoiceMarkers: string[];
+};
+
 type InterviewProfileModel = {
   evidenceSources: EvidenceSourceState[];
   facts: ProfileFact[];
@@ -289,6 +295,7 @@ type InterviewProfileModel = {
   hypotheses: Hypothesis[];
   questionPriorities: QuestionPriority[];
   communicationSignals: CommunicationSignals;
+  authenticitySignals: AuthenticitySignals;
   completionAnalysis?: CompletionAnalysis;
 };
 
@@ -877,9 +884,18 @@ function inferTargetProfileKind(profileDraft: ProfileDraft): TargetProfileKind {
   }
 
   if (
-    ["mindre ansvar", "lavere pres", "bedre balance", "uden topansvar", "roligere", "mindre pres"].some((keyword) =>
-      target.includes(keyword),
-    )
+    [
+      "mindre ansvar",
+      "lavere pres",
+      "bedre balance",
+      "uden topansvar",
+      "roligere",
+      "mindre pres",
+      "ned i tempo",
+      "ned i ansvar",
+      "traede tilbage",
+      "trae tilbage",
+    ].some((keyword) => target.includes(keyword))
   ) {
     return "less_responsibility";
   }
@@ -2667,6 +2683,22 @@ function buildCompletionAnalysis({
         evidenceStrengthVsGoal !== "sufficient"
       )
         vulnerabilities.push("Overgang uden bevist erfaring");
+      // new: CV gap / re-entry signal
+      const _expText = normalizeText(profileDraft.yearsExperience ?? "");
+      const _dirText = normalizeText(profileDraft.targetDirection ?? "");
+      const _gapKeywords = ["ledig", "arbejdslos", "gap", "pause", "orlov", "sabbat", "opsagt", "fyret", "lukket"];
+      if (_gapKeywords.some((kw) => _expText.includes(kw) || _dirText.includes(kw)))
+        vulnerabilities.push("Forklaringsbehov for CV-gap");
+      // new: confidence challenge for self-minimizers with thin evidence
+      if (signals.possibleSelfMinimizingLanguage === true && interviewState.evidenceCounts.concreteEvidenceCount < 3)
+        vulnerabilities.push("Potentiel selvtillidsudfordring");
+      // new: rusty interview format signal for same-track profiles with thin result evidence
+      if (
+        interviewState.evidenceCounts.resultEvidenceCount <= 1 &&
+        interviewState.evidenceCounts.ownershipScopeCount <= 1 &&
+        targetKind === "same_track"
+      )
+        vulnerabilities.push("Rustent interviewformat");
       const overall: "ready" | "needs_preparation" | "significant_gaps" =
         vulnerabilities.length >= 4 ||
         (evidenceStrengthVsGoal === "insufficient" && selfImageGapSeverity === "high")
@@ -3729,6 +3761,12 @@ function buildInterviewProfileModel({
       confidence: coverage.noGoClarity || coverage.workStyleFit ? "high" : "medium",
       evidenceSignals: ["target_direction", "less_responsibility", "work_style_fit"],
     });
+    interpretations.push({
+      key: "less_responsibility_experience_value",
+      statement: "Den akkumulerede erfaring er en reel styrke i raadgiver-, mentor- eller bestyrelsesfunktioner, men stilles op mod forventninger om operationelt ansvar.",
+      confidence: coverage.ownershipScope || coverage.levelSeniority ? "high" : "medium",
+      evidenceSignals: ["less_responsibility", "experience_years", "advisory_or_board_value"],
+    });
   }
 
   if (targetDirection && targetKind === "specialist_track") {
@@ -4151,6 +4189,47 @@ function buildInterviewProfileModel({
 
   questionPriorities.sort((a, b) => b.score - a.score);
 
+  const _authenticityText = normalizeText(
+    [lastUserAnswer ?? "", profileDraft.yearsExperience ?? "", profileDraft.targetDirection ?? ""].join(" "),
+  );
+  const authenticitySignals: AuthenticitySignals = {
+    passionIndicators: [
+      "glad for",
+      "elsker",
+      "braender for",
+      "brænder for",
+      "giver mig mening",
+      "meningsfyldt",
+      "engageret",
+      "passion",
+      "det jeg virkelig",
+      "det er det jeg",
+    ].filter((kw) => _authenticityText.includes(kw)),
+    valueAnchors: [
+      "vigtigt for mig",
+      "ikke gaa paa kompromis",
+      "aldrig vil",
+      "kraever",
+      "kun hvis",
+      "det er en fornaevning",
+      "maa ikke",
+      "vil ikke acceptere",
+      "det er ikke forhandleligt",
+    ].filter((kw) => _authenticityText.includes(kw)),
+    authenticVoiceMarkers: [
+      "jeg husker",
+      "jeg opdagede",
+      "jeg valgte",
+      "det betod",
+      "der laerte jeg",
+      "jeg laerte",
+      "jeg maerkede",
+      "et konkret eksempel",
+      "det skete",
+      "jeg stod med",
+    ].filter((kw) => _authenticityText.includes(kw)),
+  };
+
   return {
     evidenceSources,
     facts,
@@ -4159,6 +4238,7 @@ function buildInterviewProfileModel({
     hypotheses,
     questionPriorities,
     communicationSignals,
+    authenticitySignals,
   };
 }
 

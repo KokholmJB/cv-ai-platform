@@ -10,21 +10,22 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - profile-view-model.ts oprettet og aktiv
 - buildProfileViewModel bruges i setup-flow og profile/page.tsx
 - completionAnalysis implementeret i route.ts: communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals, recruitmentLogic, behaviorProfile, lifestyleProfile, evidenceProfile, communicationProfile, hiddenStrengths, energyConditions, interviewReadiness
-## Senest kendte teststatus
-- npm.cmd run build: pass
-- npm.cmd run test:interview-scenarios: 6 PASS / 8 WARN / 0 FAIL (14 scenarier)
+## Senest kendte teststatus (session 4, 2026-05-13)
+- npm.cmd run build: pass (typecheck clean)
+- npm.cmd run test:interview-scenarios: 12 PASS / 2 WARN / 0 FAIL (14 scenarier)
 - WARN breakdown:
-  * generic_string_value:behaviorProfile:unclear 5/14 — stochastisk variance
-  * field_signal_pattern_not_found:recruitmentLogic 1/14 — engine gap (warehouse-worker)
-  * field_signal_forbidden_value:evidenceProfile.evidenceStrengthVsGoal:sufficient 1/14 — known P1 engine gap
-  * field_signal_empty_subfield:interviewReadiness:vulnerabilities 1/14 — engine gap (job-seeker-gap)
-  * generic_string_value:lifestyleProfile:unclear 1/14 — stochastisk
-  * shallow_completion + early_completion_needs_review 1/14 — executive-transition stochastisk
+  * generic_string_value:behaviorProfile:unclear 2/14 — stochastisk LLM-variance (unclear-direction-user, career-changer)
+- Lukkede gaps denne session:
+  * interviewReadiness:vulnerabilities tom for job-seeker-gap → PASS (3 nye sårbarhedssignaler tilføjet)
+  * shallow_completion for executive-transition → PASS (less_responsibility keyword + 2. interpretation)
+  * field_signal_pattern_not_found:recruitmentLogic (warehouse-worker) → PASS (cv_and_experience scoring fix, session 3)
 ## Rettede gaps siden sidst
 - behaviorUnderPressure:unclear 6->2
 - communicationProfile:none_identified 6->0
 - interviewReadiness:vulnerabilities tom 5->0
 - workIntensityPreference:unclear 2->0
+- interviewReadiness:vulnerabilities for re-entry profiler → løst (session 4)
+- executive-transition shallow_completion → løst (session 4)
 ## Arkitekturbeslutning (2026-05-12)
 - Fire-lags AI pipeline arkitektur godkendt — erstatter regelbaseret completionAnalysis
 - M2 dedikeres til pipeline migration + korrektion + persistence; jobanbefalingsmodel flyttes til M3
@@ -33,10 +34,10 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 
 ## Næste workstream
 - Fase 0: benchmark-suite nu 14 scenarier — forudsætning for pipeline migration er opfyldt (min. 5-10)
-- P1 remaining: evidenceStrengthVsGoal engine gap
-- P2 ny: recruitmentLogic engine gap (warehouse-worker returnerer ikke cv_and_experience)
-- P2 ny: interviewReadiness:vulnerabilities tom for job-seeker-gap
-- P2: rekrutteringslogik-scenarier til dimension 5 (delvist dækket via field signals)
+- P1 remaining: evidenceStrengthVsGoal engine gap (project-manager-to-product-manager)
+- P1: anti-keyword-validering pr. scenarie
+- P1: autenticitetsprofil implementeret i motor og tests (authenticitySignals tilføjet til profileModel — fundament lagt)
+- LAG3_PROFILE_SCHEMA.md og LAG4_PROFILE_TEMPLATE.md oprettet som designdokumenter til M2
 ## M1-gate
 - M1-gate kriterier defineret og aktive (se TASK_BOARD.md)
 ## Kendte begrænsninger

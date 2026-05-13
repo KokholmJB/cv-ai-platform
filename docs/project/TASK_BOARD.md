@@ -1,9 +1,8 @@
 # TASK_BOARD
 ## Current focus
 - evidenceStrengthVsGoal engine gap (P1 remaining)
-- P2: fire manglende segment-scenarier (executive, ledig, trade-transition, SOSU same-track)
-- P2: rekrutteringslogik-scenarier til dimension 5
-- P2: adfærdsmønster-validering dimension 2
+- P1: anti-keyword-validering pr. scenarie
+- P1: autenticitetsprofil i motor og tests (authenticitySignals lagt i profileModel — Lag 3-design komplet)
 
 ## Arkitektur-migration Fase 0
 Forudsætninger der skal landes inden pipeline migration kan starte (M2):
@@ -22,15 +21,16 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 ## P1 — Blokerer M1-gate (skal laves først)
 1. ~~Indholdsvalidering af completionAnalysis-felter pr. scenarie~~ ✅
 2. Anti-keyword-validering pr. scenarie
-3. Autenticitetsprofil implementeret i motor og tests
+3. Autenticitetsprofil implementeret i motor og tests — `authenticitySignals` tilføjet til profileModel ✅ (fundament). Test-dækning mangler endnu.
 4. evidenceStrengthVsGoal engine gap
 
 ## P2 — Kritisk før M1-gate
 4. ~~Fire nye segment-scenarier: executive, ledig, trade-transition, SOSU same-track~~ ✅
 5. ~~Rekrutteringslogik-scenarier til dimension 5~~ ✅ (field signals tilføjet 4 scenarier)
 6. ~~Adfærdsmønster-validering dimension 2~~ ✅ (ambitionProfile + naturalTeamRole field signals tilføjet)
-7. recruitmentLogic engine gap: warehouse-worker returnerer ikke cv_and_experience (ny P2)
-8. interviewReadiness:vulnerabilities tom for job-seeker-gap (ny P2)
+7. ~~recruitmentLogic engine gap: warehouse-worker~~ ✅ (cv_and_experience scoring fix, session 3)
+8. ~~interviewReadiness:vulnerabilities tom for job-seeker-gap~~ ✅ (3 nye sårbarhedssignaler, session 4)
+9. ~~executive-transition shallow_completion~~ ✅ (less_responsibility keyword + 2. interpretation, session 4)
 
 ## P3 — Venter til M2
 7. Adaptiv kommunikation differentialtest
@@ -49,6 +49,13 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 - Autenticitetsprofil testet
 - Projektstyring godkender eksplicit
 ## Recently completed
+- `authenticitySignals` tilføjet til `InterviewProfileModel` (passionIndicators, valueAnchors, authenticVoiceMarkers)
+- LAG3_PROFILE_SCHEMA.md oprettet — komplet teknisk schema for Lag 3-output
+- LAG4_PROFILE_TEMPLATE.md oprettet — promptarkitektur og sektionsskabeloner for Lag 4
+- interviewReadiness: 3 nye sårbarhedssignaler (CV-gap, selvtillid, rustent interviewformat)
+- executive-transition: less_responsibility keyword-dækning udvidet ("ned i tempo", "traede tilbage" m.fl.)
+- executive-transition: 2. deterministisk interpretation for less_responsibility profiler
+- cv_and_experience scoring fix for same_track_better_conditions (session 3)
 - Fire nye segment-scenarier tilføjet: trade-transition, sosu-same-track, executive-transition, job-seeker-gap
 - recruitmentLogic field signals tilføjet til 4 scenarier (people-manager, specialist-expert, sales-customer-facing, same-role-warehouse-worker)
 - behaviorProfile ambitionProfile + naturalTeamRole field signals tilføjet til 4 scenarier (senior-less-responsibility, people-manager, specialist-expert, career-changer)
