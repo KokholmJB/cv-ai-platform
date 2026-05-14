@@ -1,17 +1,29 @@
 # TEST_LOG
 
-## Latest confirmed state (session 4, 2026-05-13)
-- `npm.cmd run build`: pass (typecheck clean, Google Fonts network-fejl ignoreres — ikke kode)
-- `npm.cmd run test:interview-scenarios`: 12 PASS / 2 WARN / 0 FAIL (14 scenarier)
+## Latest confirmed state (session 5, 2026-05-14)
+- `npm.cmd run build`: pass (typecheck clean)
+- `npm.cmd run test:interview-scenarios`: 11 PASS / 3 WARN / 0 FAIL (14 scenarier)
   - WARN breakdown:
     - generic_string_value:behaviorProfile:unclear 2/14 — stochastisk LLM-variance (unclear-direction-user, career-changer)
-  - Alle engine gaps lukket denne session
-- `npm.cmd run test:setup-ux-review`: pass (main baseline — ikke re-kørt efter motor-ændringer)
+    - generic_string_value:lifestyleProfile:unclear 1/14 — stochastisk LLM-variance (specialist-expert)
+    - early_completion_needs_review 1/14 — stochastisk timing (career-changer)
+- `npm.cmd run test:setup-ux-review`: pass
   - `interview completed=true`
   - `screenshots=11`
   - `tabs audited=5`
   - `tabs not reached=0`
   - `findings=0 WARN, 0 FAIL`
+
+## Ændringer session 5 (2026-05-14)
+| Ændring | Resultat |
+|---------|----------|
+| Lag 2 AI-sti bag ENABLE_AI_COMPLETION_ANALYSIS feature flag | ingen adfærdsændring (flag=false default) |
+| authenticityProfile tilføjet til CompletionAnalysis | typecheck clean, field signal checks pass |
+| authenticityProfile field signals tilføjet til 3 scenarier | ingen nye WARN/FAIL |
+| runAuthenticityDiversityCheck tilføjet | diversity warning for universelt low korrekt |
+| Progressbar genoprettet i interview-panel | UX review: 0 WARN 0 FAIL |
+| VENDOR_ABSTRACTION_DESIGN.md oprettet | designdokument til M2 |
+| BENCHMARK_SUITE_DESIGN.md oprettet | designdokument til M2 |
 
 ## Ændringer session 4 (2026-05-13)
 | Ændring | Resultat |
@@ -23,7 +35,7 @@
 | LAG3_PROFILE_SCHEMA.md + LAG4_PROFILE_TEMPLATE.md oprettet | designdokumenter til M2 |
 
 ## Scenarier tilføjet (session 3)
-| Scenario | Type | Status (session 3→4) |
+| Scenario | Type | Status (session 3→5) |
 |----------|------|--------|
 | trade-transition | direction_change | PASS → PASS |
 | sosu-same-track | same_track_better_conditions | PASS → PASS |
@@ -49,3 +61,4 @@
 
 ## Important
 - `test-results/` er en artefaktmappe og skal ikke committes.
+- `ENABLE_AI_COMPLETION_ANALYSIS=true` aktiverer Lag 2 AI-sti — testes ikke i scenarie-harness (kræver live API)

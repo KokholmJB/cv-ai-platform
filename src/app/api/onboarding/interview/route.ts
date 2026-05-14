@@ -1,4 +1,4 @@
-const model = "gpt-5.4-mini";
+﻿const model = "gpt-5.4-mini";
 const allowedFocusAreas = [
   "current_work_reality",
   "level_seniority",
@@ -265,6 +265,13 @@ type CommunicationProfileAnalysis = {
   languageNormalization: "minimizes" | "neutral" | "overstates";
 };
 
+type AuthenticityProfile = {
+  dominantPassions: string[];
+  coreValueAnchors: string[];
+  naturalVoiceMarkers: string[];
+  authenticityConfidence: "high" | "medium" | "low";
+};
+
 type CompletionAnalysis = {
   communicationStyle: CommunicationStyleAnalysis;
   recruitmentFit: RecruitmentFitAnalysis;
@@ -279,6 +286,7 @@ type CompletionAnalysis = {
   hiddenStrengths: string[];
   energyConditions: { peaksAt: string[]; strugglesAt: string[] };
   interviewReadiness: { overall: "ready" | "needs_preparation" | "significant_gaps"; vulnerabilities: string[] };
+  authenticityProfile: AuthenticityProfile;
 };
 
 type AuthenticitySignals = {
@@ -2710,10 +2718,330 @@ function buildCompletionAnalysis({
             : "ready";
       return { overall, vulnerabilities };
     })(),
+    authenticityProfile: (() => {
+      const authSignals = profileModel.authenticitySignals;
+      const empty: AuthenticityProfile = {
+        dominantPassions: [],
+        coreValueAnchors: [],
+        naturalVoiceMarkers: [],
+        authenticityConfidence: "low",
+      };
+      if (!authSignals) return empty;
+      const { passionIndicators, valueAnchors, authenticVoiceMarkers } = authSignals;
+      const dominantPassions = [...new Set(passionIndicators)].slice(0, 3);
+      const _genericAnchors = ["godt arbejdsmiljo", "godt arbejdsmiljoe", "god loen", "god lonn", "gode kolleger", "god lon"];
+      const coreValueAnchors = [...new Set(valueAnchors)]
+        .filter((a) => !_genericAnchors.some((g) => a.includes(g)))
+        .slice(0, 3);
+      const naturalVoiceMarkers = [...new Set(authenticVoiceMarkers)].sort((a, b) => b.length - a.length).slice(0, 5);
+      const authenticityConfidence: "high" | "medium" | "low" =
+        passionIndicators.length >= 3 && valueAnchors.length >= 2
+          ? "high"
+          : passionIndicators.length > 0 || valueAnchors.length > 0 || authenticVoiceMarkers.length > 0
+            ? "medium"
+            : "low";
+      return { dominantPassions, coreValueAnchors, naturalVoiceMarkers, authenticityConfidence };
+    })(),
   };
 }
 
-function buildDeterministicCompleteResult({
+async function buildAICompletionAnalysis({
+  profileModel,
+  profileDraft,
+  profileSummary,
+  interviewState,
+}: {
+  profileModel: InterviewProfileModel;
+  profileDraft: ProfileDraft;
+  profileSummary?: ProfileSummary;
+  interviewState: InterviewState;
+}): Promise<CompletionAnalysis> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  const fallback = () => {
+    // profileSummary is always defined when called from buildDeterministicCompleteResult
+    const resolvedSummary = profileSummary ?? buildProvisionalProfileSummary({ profileDraft, interviewState, profileModel });
+    return buildCompletionAnalysis({ profileDraft, profileSummary: resolvedSummary, profileModel, interviewState });
+  };
+
+  if (!apiKey) {
+    if (process.env.NODE_ENV !== "production") console.debug("[lag2] ANTHROPIC_API_KEY missing — using fallback");
+    return fallback();
+  }
+  const narrowedApiKey: string = apiKey;
+
+  const interviewHistory = (interviewState.recentQuestions ?? []).slice(-10);
+  const authSignals = profileModel.authenticitySignals;
+
+  const systemPrompt = [
+    "Du er JobPilots Lag 2-profileringssystem. Du analyserer akkumulerede interviewobservationer og finder mønstre på tværs af fem dimensioner: faglig profil, adfærdsmønster, kommunikationsprofil, livsstilsprofil og rekrutteringslogik.",
+    "Du er specifik og evidensbaseret. Du bruger aldrig generiske vendinger der kunne gælde enhver ansøger.",
+    "Alle string-felter returneres på dansk.",
+    "Du returnerer altid det præcise JSON-format defineret i værktøjet — intet andet.",
+  ].join(" ");
+
+  const userContent = JSON.stringify({
+    profileDraft,
+    profileSummaryCore: profileSummary?.aiProfileCore ?? null,
+    facts: profileModel.facts.slice(0, 6),
+    interpretations: profileModel.interpretations.slice(0, 6),
+    uncertainties: profileModel.uncertainties.slice(0, 5),
+    hypotheses: profileModel.hypotheses.slice(0, 4).map((h) => ({
+      key: h.key,
+      statement: h.statement,
+      supportLevel: h.supportLevel,
+      confidence: h.confidence,
+    })),
+    communicationSignals: profileModel.communicationSignals,
+    authenticitySignals: authSignals ?? null,
+    recentQuestions: interviewHistory,
+    instruction:
+      "Analysér profilen og identificer mønstre på tværs af alle dimensioner. Brug kun information der faktisk fremgår — intet generisk. Alle string-felter på dansk.",
+  });
+
+  const toolSchema = {
+    name: "analyze_profile_completion",
+    description: "Returner struktureret profilanalyse for alle fem dimensioner og kapaciteter.",
+    input_schema: {
+      type: "object",
+      required: [
+        "communicationStyle",
+        "recruitmentFit",
+        "strengthGaps",
+        "energyMap",
+        "credibilitySignals",
+        "recruitmentLogic",
+        "behaviorProfile",
+        "lifestyleProfile",
+        "evidenceProfile",
+        "communicationProfile",
+        "hiddenStrengths",
+        "energyConditions",
+        "interviewReadiness",
+        "authenticityProfile",
+      ],
+      properties: {
+        communicationStyle: {
+          type: "object",
+          required: ["answerLength", "abstractionLevel", "selfReferences", "tone"],
+          properties: {
+            answerLength: { type: "string", enum: ["short", "medium", "narrative"] },
+            abstractionLevel: { type: "string", enum: ["concrete", "conceptual"] },
+            selfReferences: { type: "string", enum: ["active_i", "distancing_we"] },
+            tone: { type: "string", enum: ["direct", "exploratory"] },
+          },
+        },
+        recruitmentFit: {
+          type: "object",
+          required: ["communicationStyleMatchToRecruitmentExpectations", "likelyUnderseller"],
+          properties: {
+            communicationStyleMatchToRecruitmentExpectations: { type: "string" },
+            likelyUnderseller: { type: ["boolean", "string"] },
+          },
+        },
+        strengthGaps: {
+          type: "object",
+          required: ["explicitlyMentionedStrengths", "implicitStrengthsFromExamples", "discrepancyConfidence"],
+          properties: {
+            explicitlyMentionedStrengths: { type: "array", items: { type: "string" } },
+            implicitStrengthsFromExamples: { type: "array", items: { type: "string" } },
+            discrepancyConfidence: { type: "string", enum: ["medium", "low"] },
+          },
+        },
+        energyMap: {
+          type: "object",
+          required: ["energizers", "drainers"],
+          properties: {
+            energizers: { type: "array", items: { type: "string" } },
+            drainers: { type: "array", items: { type: "string" } },
+          },
+        },
+        credibilitySignals: {
+          type: "object",
+          required: ["consistency", "identifiedContradictions", "claimsWithoutSupportingEvidence"],
+          properties: {
+            consistency: { type: "string", enum: ["high", "medium", "low"] },
+            identifiedContradictions: { type: "array", items: { type: "string" } },
+            claimsWithoutSupportingEvidence: { type: "array", items: { type: "string" } },
+          },
+        },
+        recruitmentLogic: {
+          type: "object",
+          required: ["type", "confidence"],
+          properties: {
+            type: { type: "string", enum: ["chemistry_and_fit", "cv_and_experience", "documented_results", "personality_and_culture", "academic_and_structured"] },
+            confidence: { type: "string", enum: ["high", "medium", "low"] },
+          },
+        },
+        behaviorProfile: {
+          type: "object",
+          required: ["behaviorUnderPressure", "naturalTeamRole", "decisionStyle", "ambitionProfile", "selfImageGap"],
+          properties: {
+            behaviorUnderPressure: { type: "string", enum: ["problem_solver", "withdraws", "seeks_support", "takes_control", "unclear"] },
+            naturalTeamRole: { type: "string", enum: ["initiator", "executor", "coordinator", "specialist", "unclear"] },
+            decisionStyle: { type: "string", enum: ["analytical", "intuitive", "consensus_seeking", "action_oriented"] },
+            ambitionProfile: { type: "string", enum: ["upward", "lateral", "less_responsibility", "better_conditions", "unclear"] },
+            selfImageGap: {
+              type: "object",
+              required: ["likelySeverity", "signals"],
+              properties: {
+                likelySeverity: { type: "string", enum: ["low", "medium", "high"] },
+                signals: { type: "array", items: { type: "string" } },
+              },
+            },
+          },
+        },
+        lifestyleProfile: {
+          type: "object",
+          required: ["workIntensityPreference", "flexibilityNeeds", "lifestyleFit", "sustainabilityRisk"],
+          properties: {
+            workIntensityPreference: { type: "string", enum: ["high", "moderate", "steady", "unclear"] },
+            flexibilityNeeds: {
+              type: "object",
+              required: ["workLocation", "scheduleFlexibility"],
+              properties: {
+                workLocation: { type: "string", enum: ["remote", "hybrid", "onsite", "unclear"] },
+                scheduleFlexibility: { type: "string", enum: ["high", "moderate", "low", "unclear"] },
+              },
+            },
+            lifestyleFit: { type: "string", enum: ["good_fit", "potential_mismatch", "unclear"] },
+            sustainabilityRisk: { type: "string", enum: ["low", "medium", "high"] },
+          },
+        },
+        evidenceProfile: {
+          type: "object",
+          required: ["evidenceClassification", "evidenceStrengthVsGoal", "transferableStrengths"],
+          properties: {
+            evidenceClassification: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["strength", "classification"],
+                properties: {
+                  strength: { type: "string" },
+                  classification: { type: "string", enum: ["user_claim", "concrete_example", "proven_responsibility", "measurable_result", "pattern"] },
+                },
+              },
+            },
+            evidenceStrengthVsGoal: { type: "string", enum: ["sufficient", "borderline", "insufficient"] },
+            transferableStrengths: { type: "array", items: { type: "string" } },
+          },
+        },
+        communicationProfile: {
+          type: "object",
+          required: ["selfPromotionComfort", "recruitmentFormatVulnerabilities", "credibilityInConversation", "languageNormalization"],
+          properties: {
+            selfPromotionComfort: { type: "string", enum: ["undersells", "balanced", "oversells"] },
+            recruitmentFormatVulnerabilities: { type: "array", items: { type: "string", enum: ["structured_competency", "case_interview", "presentation", "small_talk", "none_identified"] } },
+            credibilityInConversation: { type: "string", enum: ["strong", "moderate", "weak"] },
+            languageNormalization: { type: "string", enum: ["minimizes", "neutral", "overstates"] },
+          },
+        },
+        hiddenStrengths: { type: "array", items: { type: "string" } },
+        energyConditions: {
+          type: "object",
+          required: ["peaksAt", "strugglesAt"],
+          properties: {
+            peaksAt: { type: "array", items: { type: "string" } },
+            strugglesAt: { type: "array", items: { type: "string" } },
+          },
+        },
+        interviewReadiness: {
+          type: "object",
+          required: ["overall", "vulnerabilities"],
+          properties: {
+            overall: { type: "string", enum: ["ready", "needs_preparation", "significant_gaps"] },
+            vulnerabilities: { type: "array", items: { type: "string" } },
+          },
+        },
+        authenticityProfile: {
+          type: "object",
+          required: ["dominantPassions", "coreValueAnchors", "naturalVoiceMarkers", "authenticityConfidence"],
+          properties: {
+            dominantPassions: { type: "array", items: { type: "string" } },
+            coreValueAnchors: { type: "array", items: { type: "string" } },
+            naturalVoiceMarkers: { type: "array", items: { type: "string" } },
+            authenticityConfidence: { type: "string", enum: ["high", "medium", "low"] },
+          },
+        },
+      },
+    },
+  };
+
+  const t0 = Date.now();
+
+  async function attemptCall(retryContext?: string): Promise<CompletionAnalysis | null> {
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": narrowedApiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-5",
+          max_tokens: 2000,
+          system: systemPrompt,
+          tools: [toolSchema],
+          tool_choice: { type: "tool", name: "analyze_profile_completion" },
+          messages: [
+            {
+              role: "user",
+              content: retryContext ? `${userContent}\n\nRetry note: ${retryContext}` : userContent,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug(`[lag2] Anthropic API error ${response.status}`);
+        }
+        return null;
+      }
+
+      const data = (await response.json()) as {
+        content?: { type: string; name?: string; input?: unknown }[];
+        stop_reason?: string;
+      };
+
+      const toolBlock = data.content?.find((c) => c.type === "tool_use" && c.name === "analyze_profile_completion");
+      if (!toolBlock || !toolBlock.input) return null;
+
+      const parsed = toolBlock.input as CompletionAnalysis;
+      // Basic validation: check required top-level keys
+      const required = ["communicationStyle", "recruitmentFit", "strengthGaps", "energyMap", "credibilitySignals", "recruitmentLogic", "behaviorProfile", "lifestyleProfile", "evidenceProfile", "communicationProfile", "hiddenStrengths", "energyConditions", "interviewReadiness", "authenticityProfile"];
+      for (const key of required) {
+        if (!(key in (parsed as Record<string, unknown>))) return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  let result = await attemptCall();
+  if (!result) {
+    result = await attemptCall("Første forsøg fejlede — returner det præcise JSON-format uden afvigelse.");
+  }
+
+  const elapsed = Date.now() - t0;
+
+  if (result) {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(`[lag2] AI completion analysis succeeded in ${elapsed}ms`);
+    }
+    return result;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.debug(`[lag2] AI completion analysis failed after ${elapsed}ms — falling back to rule-based`);
+  }
+  return fallback();
+}
+
+async function buildDeterministicCompleteResult({
   profileDraft,
   interviewState,
   profileModel,
@@ -2721,7 +3049,7 @@ function buildDeterministicCompleteResult({
   profileDraft: ProfileDraft;
   interviewState: InterviewState;
   profileModel: InterviewProfileModel;
-}): Extract<GenerateSuccess, { status: "complete" }> {
+}): Promise<Extract<GenerateSuccess, { status: "complete" }>> {
   const profileSummary = buildProvisionalProfileSummary({ profileDraft, interviewState, profileModel });
   const completedInterviewState = updateInterviewState({
     interviewState,
@@ -2729,6 +3057,23 @@ function buildDeterministicCompleteResult({
     lastUserAnswer: null,
     profileSummary,
   });
+  const useAIAnalysis = process.env.ENABLE_AI_COMPLETION_ANALYSIS === "true";
+  const completionAnalysis = useAIAnalysis
+    ? await buildAICompletionAnalysis({
+        profileModel,
+        profileDraft,
+        profileSummary,
+        interviewState: completedInterviewState,
+      })
+    : buildCompletionAnalysis({
+        profileDraft,
+        profileSummary,
+        profileModel,
+        interviewState: completedInterviewState,
+      });
+  if (process.env.NODE_ENV !== "production") {
+    console.debug(`[interview] completion analysis: ${useAIAnalysis ? "ai" : "rule-based"}`);
+  }
   const completedProfileModel: InterviewProfileModel = {
     ...buildInterviewProfileModel({
       profileDraft,
@@ -2736,12 +3081,7 @@ function buildDeterministicCompleteResult({
       profileSummary,
       lastUserAnswer: null,
     }),
-    completionAnalysis: buildCompletionAnalysis({
-      profileDraft,
-      profileSummary,
-      profileModel,
-      interviewState: completedInterviewState,
-    }),
+    completionAnalysis,
   };
 
   return {
@@ -4813,7 +5153,7 @@ export async function POST(request: Request) {
         }
 
         return Response.json(
-          buildDeterministicCompleteResult({
+          await buildDeterministicCompleteResult({
             profileDraft,
             interviewState: workingInterviewState,
             profileModel: workingProfileModel,
@@ -5302,7 +5642,7 @@ export async function POST(request: Request) {
             console.debug("[interview] completed with uncertainty after repeated question hard stop");
           }
 
-          return buildDeterministicCompleteResult({
+          return await buildDeterministicCompleteResult({
             profileDraft,
             interviewState: updatedInterviewState,
             profileModel: updatedProfileModel,
@@ -5353,7 +5693,7 @@ export async function POST(request: Request) {
             console.debug("[interview] completed instead of returning repeated question");
           }
 
-          return buildDeterministicCompleteResult({
+          return await buildDeterministicCompleteResult({
             profileDraft,
             interviewState: updatedInterviewState,
             profileModel: updatedProfileModel,
@@ -5372,7 +5712,7 @@ export async function POST(request: Request) {
             console.debug("[interview] completed with uncertainty after repeated question and no recovery path");
           }
 
-          return buildDeterministicCompleteResult({
+          return await buildDeterministicCompleteResult({
             profileDraft,
             interviewState: updatedInterviewState,
             profileModel: updatedProfileModel,
@@ -5460,7 +5800,7 @@ export async function POST(request: Request) {
               console.debug("[interview] completed instead of returning saturated-family recovery question");
             }
 
-            return buildDeterministicCompleteResult({
+            return await buildDeterministicCompleteResult({
               profileDraft,
               interviewState: updatedInterviewState,
               profileModel: updatedProfileModel,
@@ -5524,7 +5864,7 @@ export async function POST(request: Request) {
               console.debug("[interview] completed instead of returning saturated-evidence recovery question");
             }
 
-            return buildDeterministicCompleteResult({
+            return await buildDeterministicCompleteResult({
               profileDraft,
               interviewState: updatedInterviewState,
               profileModel: updatedProfileModel,
@@ -5624,7 +5964,7 @@ export async function POST(request: Request) {
             console.debug("[interview] completed with uncertainty because no unsaturated question remained");
           }
 
-          return buildDeterministicCompleteResult({
+          return await buildDeterministicCompleteResult({
             profileDraft,
             interviewState: updatedInterviewState,
             profileModel: updatedProfileModel,
@@ -5670,7 +6010,7 @@ export async function POST(request: Request) {
           console.debug("[interview] completed instead of continuing after deterministic post-processing gate");
         }
 
-        return buildDeterministicCompleteResult({
+        return await buildDeterministicCompleteResult({
           profileDraft,
           interviewState: updatedInterviewState,
           profileModel: updatedProfileModel,

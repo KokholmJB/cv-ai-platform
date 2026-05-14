@@ -633,6 +633,29 @@ export function SetupFlow() {
 
         {interviewResult.status === "continue" ? (
           <div className="mt-6 space-y-4">
+            {(() => {
+              const coverageCount = Object.values(interviewState.coverage).filter(Boolean).length;
+              const pct = Math.min(90, Math.round((coverageCount / 14) * 100));
+              const label =
+                pct <= 30 ? "Vi er i gang — fortæl mig mere"
+                : pct <= 60 ? "God fremdrift — vi nærmer os"
+                : pct <= 90 ? "Næsten der — et par ting mere"
+                : "Profilen er klar";
+              return (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-xs font-medium text-slate-500">{label}</p>
+                    <p className="text-xs tabular-nums text-slate-400">{pct}%</p>
+                  </div>
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-slate-950 transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
             <div className="rounded-[1.25rem] border border-cyan-100 bg-cyan-50/80 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-950">
                 Fokusområde: {formatFocusAreaLabel(interviewResult.focusArea)}

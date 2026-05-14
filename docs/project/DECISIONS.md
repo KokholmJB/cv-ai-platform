@@ -38,3 +38,7 @@
 25. Benchmark-suite med 5-10 scenarier bygges som Fase 0-forudsætning for pipeline migration. Benchmarken måler Lag 2-output kvalitativt og kvantitativt og bruges til at validere migration.
 26. Modelmix-udgangspunkt: Opus-tier til Lag 2, 3 og 4 (profilering, autenticitet, output). Hurtig tier til Lag 1 (interview-motor). Revideres efter benchmark.
 27. Vendor-abstraktion er arkitekturkrav fra dag ét. Ingen hardkodet binding til én AI-udbyder. Pipeline-laget skal kunne skifte model-udbyder uden ændring af forretningslogik.
+
+## Lag 2 implementation (godkendt 2026-05-14)
+28. Lag 2 AI-sti implementeres bag feature flag `ENABLE_AI_COMPLETION_ANALYSIS=true`. Default er false — regelbaseret completionAnalysis er produktionsstien indtil benchmark validerer AI-stien. Feature-flag ryddes når AI-stien er valideret i M2.
+29. `AuthenticityProfile` er syntetiseret felt i `CompletionAnalysis` (ikke direkte fra profileModel). Det er output af Lag 2's aggregering af `authenticitySignals` fra alle svar. Lag 3 vil i M2 udvide dette til fuldt autenticitets- og værdimatch.

@@ -2,18 +2,18 @@
 ## Current focus
 - evidenceStrengthVsGoal engine gap (P1 remaining)
 - P1: anti-keyword-validering pr. scenarie
-- P1: autenticitetsprofil i motor og tests (authenticitySignals lagt i profileModel — Lag 3-design komplet)
+- P1: autenticitetsprofil test-dækning (authenticitySignals i motor ✅ — test kan ikke passere med scripted data endnu)
 
 ## Arkitektur-migration Fase 0
 Forudsætninger der skal landes inden pipeline migration kan starte (M2):
-- [ ] Benchmark-suite: 5-10 scenarier der måler Lag 2-output kvalitativt og kvantitativt
-- [ ] Vendor-abstraktion: interface-lag der skjuler model-udbyder fra forretningslogik
+- [x] Benchmark-suite: 14 scenarier (min. 5-10 opfyldt) — BENCHMARK_SUITE_DESIGN.md dokumenteret
+- [ ] Vendor-abstraktion: interface-lag der skjuler model-udbyder fra forretningslogik — VENDOR_ABSTRACTION_DESIGN.md dokumenteret, ingen implementation endnu
 - [ ] Persistence-model: database-design for profil og korrektionshistorik
 - [ ] Korrektionskontrakt: API-design for bruger-korrektion af AI-fortolkninger
 - [ ] Modelmix-konfiguration: Opus-tier til Lag 2-3-4, hurtig tier til Lag 1
 
 ## UX/Design — Fase 1 (blokerer M1-gate)
-- Progressbar under interview tilbage og meningsfuld
+- Progressbar under interview tilbage og meningsfuld ✅ (session 5)
 - Layout omstruktureret til system-look frem for hjemmeside
 - Næste-skridt logik tydelig på alle sider
 - Konsistent komponent-sprog
@@ -21,7 +21,7 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 ## P1 — Blokerer M1-gate (skal laves først)
 1. ~~Indholdsvalidering af completionAnalysis-felter pr. scenarie~~ ✅
 2. Anti-keyword-validering pr. scenarie
-3. Autenticitetsprofil implementeret i motor og tests — `authenticitySignals` tilføjet til profileModel ✅ (fundament). Test-dækning mangler endnu.
+3. Autenticitetsprofil implementeret i motor og tests — `authenticitySignals` ✅, `authenticityProfile` i CompletionAnalysis ✅. Test-dækning med reel signal-detektion mangler endnu.
 4. evidenceStrengthVsGoal engine gap
 
 ## P2 — Kritisk før M1-gate
@@ -48,7 +48,16 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 - Indholdsvalidering af completionAnalysis aktiv
 - Autenticitetsprofil testet
 - Projektstyring godkender eksplicit
-## Recently completed
+## Recently completed (session 5, 2026-05-14)
+- Lag 2 AI-sti implementeret bag `ENABLE_AI_COMPLETION_ANALYSIS` feature flag (claude-opus-4-5, tool_use, fallback)
+- `AuthenticityProfile` type tilføjet + `authenticityProfile` felt i `CompletionAnalysis`
+- `buildCompletionAnalysis()` syntetiserer `authenticityProfile` fra `authenticitySignals`
+- `authenticityProfile` field signals tilføjet til 3 scenarier (career-changer, pm-to-pm, people-manager)
+- `runAuthenticityDiversityCheck()` tilføjet til run-interview-scenarios.ts
+- Progressbar genoprettet i interview-panel med coverage-baseret pct og stage-labels
+- VENDOR_ABSTRACTION_DESIGN.md oprettet
+- BENCHMARK_SUITE_DESIGN.md oprettet
+## Recently completed (session 4, 2026-05-13)
 - `authenticitySignals` tilføjet til `InterviewProfileModel` (passionIndicators, valueAnchors, authenticVoiceMarkers)
 - LAG3_PROFILE_SCHEMA.md oprettet — komplet teknisk schema for Lag 3-output
 - LAG4_PROFILE_TEMPLATE.md oprettet — promptarkitektur og sektionsskabeloner for Lag 4
@@ -83,6 +92,7 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 - Dimension 3: communicationProfile tilføjet (selfPromotionComfort, recruitmentFormatVulnerabilities, credibilityInConversation, languageNormalization)
 ## Known limitations
 - specialist-expert og project-manager-to-product-manager earlyCompletionWarning — stokastisk LLM-varians, ikke regressionsfejl
+- authenticityProfile confidence universelt low i scenarietests — scripted svar indeholder ikke passion/value nøgleord
 ## Parked / later
 - Persistence/database
 - Payment/abonnement

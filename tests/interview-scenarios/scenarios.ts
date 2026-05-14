@@ -41,6 +41,7 @@ export type CompletionQualityExpectations = {
     interviewReadiness?: FieldSignalExpectation;
     evidenceProfile?: FieldSignalExpectation;
     communicationProfile?: FieldSignalExpectation;
+    authenticityProfile?: FieldSignalExpectation;
   };
 };
 
@@ -275,6 +276,7 @@ export const interviewScenarios: InterviewScenario[] = [
       expectedFieldSignals: {
         evidenceProfile: { forbiddenExactValues: ["sufficient"] },
         interviewReadiness: { requiredSubfields: ["vulnerabilities"] },
+        authenticityProfile: { required: true, requiredSubfields: ["authenticityConfidence"] },
       },
     },
   },
@@ -310,6 +312,7 @@ export const interviewScenarios: InterviewScenario[] = [
       expectedFieldSignals: {
         recruitmentLogic: { required: true, forbiddenExactValues: ["chemistry_and_fit"] },
         behaviorProfile: { forbiddenExactValues: ["less_responsibility"] },
+        authenticityProfile: { required: true },
       },
     },
   },
@@ -419,6 +422,7 @@ export const interviewScenarios: InterviewScenario[] = [
         evidenceProfile: { requiredSubfields: ["transferableStrengths"] },
         energyConditions: { requiredSubfields: ["strugglesAt"] },
         behaviorProfile: { expectedPatterns: [/lateral/] },
+        authenticityProfile: { required: true, requiredSubfields: ["authenticityConfidence"] },
       },
     },
   },

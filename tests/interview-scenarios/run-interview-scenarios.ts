@@ -793,6 +793,22 @@ function runDiversityCheck(results: ScenarioResult[]) {
   }
 }
 
+function runAuthenticityDiversityCheck(results: ScenarioResult[]) {
+  const completed = results.filter((r) => r.completionAnalysisSnapshot !== null);
+  if (completed.length === 0) return;
+
+  const allLow = completed.every((r) => {
+    const profile = r.completionAnalysisSnapshot?.["authenticityProfile"];
+    return typeof profile === "object" && profile !== null && (profile as Record<string, unknown>)["authenticityConfidence"] === "low";
+  });
+
+  if (allLow) {
+    console.log(
+      `[diversity] authenticityProfile confidence universally low across ${completed.length} scenarios — signal detection may be too passive`,
+    );
+  }
+}
+
 async function main() {
   loadLocalEnv();
 
@@ -814,6 +830,7 @@ async function main() {
 
   printSummary(results);
   runDiversityCheck(results);
+  runAuthenticityDiversityCheck(results);
 
   if (results.some((result) => result.status === "FAIL")) {
     process.exitCode = 1;
