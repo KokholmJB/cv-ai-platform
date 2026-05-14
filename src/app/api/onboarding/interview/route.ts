@@ -2560,12 +2560,92 @@ function buildCompletionAnalysis({
       .filter((s) => !profileSummary.aiProfileCore.transferableStrengths.includes(s)),
   ];
 
+  // new field inferences — computed here so they are accessible in the return IIFEs
+
+  // credibilitySignals.contradictionMarkers
+  const contradictionMarkers: string[] = (() => {
+    const markers: string[] = [];
+    for (const hyp of profileModel.hypotheses) {
+      if (hyp.contradictionLevel !== "none" && hyp.unresolved) {
+        markers.push(`Uopløst modsætning: ${hyp.statement.slice(0, 80)}`);
+      }
+    }
+    const highConfKeys = new Set(
+      profileModel.interpretations.filter((i) => i.confidence === "high").map((i) => i.key),
+    );
+    for (const interp of profileModel.interpretations) {
+      if (interp.confidence === "low" && highConfKeys.has(interp.key)) {
+        markers.push(`Modstridende fortolkning: ${interp.statement.slice(0, 80)}`);
+      }
+    }
+    return markers.slice(0, 3);
+  })();
+
+  // credibilitySignals.evidenceVsClaimsGap
+  const userClaimCount = evidenceClassification.filter((e) => e.classification === "user_claim").length;
+  const measurableResultCount = evidenceClassification.filter((e) => e.classification === "measurable_result").length;
+  const evidenceVsClaimsGap: CredibilitySignalsAnalysis["evidenceVsClaimsGap"] =
+    userClaimCount >= 4 && measurableResultCount < 2
+      ? "significant"
+      : userClaimCount >= 2 || selfImageGapSeverity === "high"
+        ? "moderate"
+        : "minimal";
+
+  // credibilitySignals.emotionalLoad
+  const coverageAdvancedCount = Object.values(interviewState.coverage).filter(Boolean).length;
+  const likelyRedirectionCount = Math.max(0, interviewState.answeredTurns - coverageAdvancedCount);
+  const emotionalLoad: CredibilitySignalsAnalysis["emotionalLoad"] =
+    (signals.possibleSelfMinimizingLanguage === true &&
+      (sustainabilityRisk === "high" || drainers.length >= 3)) ||
+    likelyRedirectionCount >= 5
+      ? "high"
+      : signals.possibleSelfMinimizingLanguage === true || sustainabilityRisk === "medium"
+        ? "moderate"
+        : "low";
+
+  // lifestyleProfile.workloadHistory
+  const workloadHistory: LifestyleProfileAnalysis["workloadHistory"] =
+    targetKind === "unclear"
+      ? "unclear"
+      : targetKind === "next_level" ||
+          ["leder", "ledelse", "head of", "director", "chef", "manager"].some(
+            (k) => targetNorm.includes(k) || roleNorm.includes(k),
+          ) ||
+          interviewState.evidenceCounts.resultEvidenceCount >= 3
+        ? "high"
+        : targetKind === "less_responsibility" || sustainabilityRisk === "high"
+          ? "low"
+          : "moderate";
+
+  // lifestyleProfile.economicConstraints
+  const economicConstraints: string[] = (() => {
+    const constraints: string[] = [];
+    const econKeywords: [string, string][] = [
+      ["lon", "Lønkrav eller lønniveau nævnt"],
+      ["pension", "Pensionsordning nævnt som prioritet"],
+      ["overenskomst", "Overenskomstdækning nævnt"],
+      ["deltid", "Deltidsønske identificeret"],
+      ["fuldtid", "Fuldtidsønske identificeret"],
+      ["timer", "Timebegrænsning eller timekrav nævnt"],
+    ];
+    const searchText = [
+      normalizeText(profileDraft.targetDirection ?? ""),
+      normalizeText(profileDraft.yearsExperience ?? ""),
+    ].join(" ");
+    for (const [keyword, label] of econKeywords) {
+      if (searchText.includes(keyword) && !constraints.includes(label)) {
+        constraints.push(label);
+      }
+    }
+    return constraints.slice(0, 3);
+  })();
+
   return {
     communicationStyle: { answerLength, abstractionLevel, selfReferences, tone },
     recruitmentFit: { communicationStyleMatchToRecruitmentExpectations, likelyUnderseller },
     strengthGaps: { explicitlyMentionedStrengths, implicitStrengthsFromExamples, discrepancyConfidence },
     energyMap: { energizers, drainers },
-    credibilitySignals: { consistency, identifiedContradictions, claimsWithoutSupportingEvidence },
+    credibilitySignals: { consistency, identifiedContradictions, claimsWithoutSupportingEvidence, contradictionMarkers, evidenceVsClaimsGap, emotionalLoad },
     recruitmentLogic: { type: rlType, confidence: rlConfidence },
     behaviorProfile: {
       behaviorUnderPressure,
@@ -2579,6 +2659,8 @@ function buildCompletionAnalysis({
       flexibilityNeeds: { workLocation, scheduleFlexibility },
       lifestyleFit,
       sustainabilityRisk,
+      economicConstraints,
+      workloadHistory,
     },
     evidenceProfile: { evidenceClassification, evidenceStrengthVsGoal, transferableStrengths },
     communicationProfile: (() => {
@@ -2729,7 +2811,20 @@ function buildCompletionAnalysis({
               selfImageGapSeverity === "high"
             ? "needs_preparation"
             : "ready";
-      return { overall, vulnerabilities };
+      const criticalRecommendations: string[] = [];
+      if (overall === "significant_gaps")
+        criticalRecommendations.push("Øv konkrete eksempler på ansvar og resultater inden samtalen");
+      if (likelyUnderseller === true)
+        criticalRecommendations.push("Træn at præsentere dine styrker direkte uden at nedtone dem");
+      if (
+        signals.structureLevel === "low" ||
+        signals.possibleSelfMinimizingLanguage === true ||
+        (abstractionLevel === "conceptual" && signals.evidenceDensity === "low")
+      )
+        criticalRecommendations.push("Forbered STAR-svar til kompetencebaserede spørgsmål");
+      if (evidenceVsClaimsGap === "significant")
+        criticalRecommendations.push("Identificer 2-3 konkrete eksempler der understøtter dine vigtigste styrke-claims");
+      return { overall, vulnerabilities, criticalRecommendations: criticalRecommendations.slice(0, 3) };
     })(),
     authenticityProfile: (() => {
       const authSignals = profileModel.authenticitySignals;

@@ -17,20 +17,24 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - completionAnalysis implementeret i route.ts: communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals, recruitmentLogic, behaviorProfile, lifestyleProfile, evidenceProfile, communicationProfile, hiddenStrengths, energyConditions, interviewReadiness, authenticityProfile
 - Lag 2 AI-sti implementeret bag ENABLE_AI_COMPLETION_ANALYSIS feature flag (claude-opus-4-5, tool_use structured output, fallback til regelbaseret)
 - Progressbar i interview-panel genoprettet med stage-baserede labels og coverage-baseret pct
-## Senest kendte teststatus (session 5, 2026-05-14)
+## Senest kendte teststatus (session 11, 2026-05-14)
 - npm.cmd run build: pass (typecheck clean)
-- npm.cmd run test:interview-scenarios: 11 PASS / 3 WARN / 0 FAIL (14 scenarier)
-- WARN breakdown:
-  * generic_string_value:behaviorProfile:unclear 2/14 — stochastisk LLM-variance (unclear-direction-user, career-changer)
-  * generic_string_value:lifestyleProfile:unclear 1/14 — stochastisk LLM-variance (specialist-expert)
-  * early_completion_needs_review 1/14 — stochastisk timing (career-changer)
+- npm.cmd run test:interview-scenarios: 9 PASS / 5 WARN / 0 FAIL (14 scenarier)
+- WARN breakdown (alle stochastisk LLM-variance):
+  * generic_string_value:behaviorProfile:unclear 2/14 — unclear-direction-user, career-changer
+  * generic_string_value:lifestyleProfile:unclear 2/14 — specialist-expert, unclear-direction-user
+  * early_completion_needs_review 1/14 — project-manager-to-product-manager
+- Diversity output: credibilitySignals.evidenceVsClaimsGap universelt "minimal" (14/14), emotionalLoad "moderate" (11/14) — inference for nye felter er konservativ
 - npm.cmd run test:setup-ux-review: 0 WARN, 0 FAIL (interview completed=true, turns=7, screenshots=11, tabs=5)
-## Rettede gaps siden sidst (session 4-5)
+## Rettede gaps siden sidst (session 4-11)
 - interviewReadiness:vulnerabilities for re-entry profiler → løst (3 nye sårbarhedssignaler)
 - executive-transition shallow_completion → løst (less_responsibility keyword + 2. interpretation)
 - authenticityProfile tilføjet til CompletionAnalysis (syntetiseret fra authenticitySignals)
 - Lag 2 AI-sti bag feature flag — ingen adfærdsændring i produktion (flag = false default)
 - authenticityProfile field signals tilføjet til 3 scenarier (career-changer, project-manager-to-product-manager, people-manager)
+- 6 nye optional felter tilføjet til 4 typer i route.ts: contradictionMarkers, evidenceVsClaimsGap, emotionalLoad (CredibilitySignalsAnalysis), economicConstraints, workloadHistory (LifestyleProfileAnalysis), passionIndicators, valueAnchors (AuthenticityProfile), criticalRecommendations (InterviewReadinessAnalysis)
+- Inference logic implementeret for alle 6 nye felter i buildCompletionAnalysis()
+- field_signal_forbidden_value:lifestyleProfile.workloadHistory:high regression rettet — scenarios bruger nu forbiddenPatterns i stedet for forbiddenExactValues for workIntensityPreference
 ## Arkitekturbeslutning (2026-05-12)
 - Fire-lags AI pipeline arkitektur godkendt — erstatter regelbaseret completionAnalysis
 - M2 dedikeres til pipeline migration + korrektion + persistence; jobanbefalingsmodel flyttes til M3

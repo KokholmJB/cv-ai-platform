@@ -380,7 +380,7 @@ export const interviewScenarios: InterviewScenario[] = [
       minimumMatchedConcepts: 2,
       expectedFieldSignals: {
         behaviorProfile: { forbiddenExactValues: ["upward"] },
-        lifestyleProfile: { forbiddenExactValues: ["high"] },
+        lifestyleProfile: { forbiddenPatterns: [/"workIntensityPreference":"high"/] },
         energyConditions: { requiredSubfields: ["strugglesAt"] },
       },
     },
@@ -466,7 +466,7 @@ export const interviewScenarios: InterviewScenario[] = [
       minimumMatchedConcepts: 2,
       expectedFieldSignals: {
         evidenceProfile: { requiredSubfields: ["transferableStrengths"] },
-        lifestyleProfile: { forbiddenExactValues: ["high"] },
+        lifestyleProfile: { forbiddenPatterns: [/"workIntensityPreference":"high"/] },
       },
     },
   },
@@ -508,7 +508,7 @@ export const interviewScenarios: InterviewScenario[] = [
       expectedConcepts: ["SOSU", "omsorg", "dagvagter", "nattevagter"],
       minimumMatchedConcepts: 2,
       expectedFieldSignals: {
-        lifestyleProfile: { forbiddenExactValues: ["high"] },
+        lifestyleProfile: { forbiddenPatterns: [/"workIntensityPreference":"high"/] },
       },
     },
   },
@@ -553,7 +553,7 @@ export const interviewScenarios: InterviewScenario[] = [
       minimumMatchedConcepts: 2,
       expectedFieldSignals: {
         behaviorProfile: { forbiddenExactValues: ["upward"] },
-        lifestyleProfile: { forbiddenExactValues: ["high"] },
+        lifestyleProfile: { forbiddenPatterns: [/"workIntensityPreference":"high"/] },
       },
     },
   },
