@@ -1,23 +1,51 @@
 ﻿# PRODUCT_REQUIREMENTS_V1
 
-## Formål med V1
-V1 skal bevise JobPilots kerne-wedge:
-- seriøst profilfundament
-- bedre jobbeslutninger
-- fundament for målrettet CV/ansøgningsarbejde
+## Vision og strategisk kerne
 
-V1 behøver ikke levere alle senere moduler fuldt ud. V1 skal bevise, at kerne-logikken virker i praksis.
+JobPilot er ikke et CV-værktøj. JobPilot er et AI-drevet ekspertpanel der arbejder sammen om ét mål: at maksimere brugerens reelle chance for at komme til samtale — og på sigt få jobbet.
+
+Visionen er at systemet svarer til at sende sine oplysninger til 10+ af de bedste og mest erfarne specialister inden for HR, psykologi, erhvervsledelse, job coaching, markedsføring, karrierestrategi og samtalecoaching — der arbejder parallelt, syntetiserer deres viden, og producerer en samlet strategisk plan for brugeren.
+
+**Overordnet kvalitetsmål:** Brugere der følger systemets anbefalinger skal have dokumenteret 50%+ chance for at komme til samtale på de jobs de søger.
+
+**North Star metric:** Interview rate per qualified application.
+Får brugeren flere relevante samtaler ud af færre men bedre valgte ansøgninger?
+
+## Strategisk kerne — beslutningskvalitet
+
+Det centrale spørgsmål er ikke:
+"Kan AI skrive mit CV?"
+
+Det centrale spørgsmål er:
+"Bør jeg søge dette job — og hvad er min reelle chance?"
+
+JobPilot skal reducere spildt energi i jobsøgningen. Mange søger for bredt, for tilfældigt, for urealistisk, eller uden at forstå hvad arbejdsgiveren faktisk leder efter.
+
+Prioriteringsrækkefølge:
+1. Match quality — forstå personen og jobmuligheden først
+2. Understanding the person — dybde før bredde
+3. Document quality — stærke dokumenter på stærkt fundament
+4. Workflow — overblik og struktur
+5. Learning loop — lær af markedets respons
+6. Coaching — forberedelse og samtale
+
+CV og ansøgninger er vigtige — men de er kun stærke hvis JobPilot først har forstået brugeren ordentligt.
 
 ## Hvad JobPilot V1 skal være
-- Et AI-baseret job-search operating system (ikke kun dokumentgenerator).
-- Denmark-first og Danish-first.
-- Et kontrolleret workflow-produkt (ikke open-ended chatbot).
-- Et produkt med tydelig adskillelse mellem personlig profil og teknisk AI-profil.
 
-## Hvad JobPilot V1 ikke må blive
-- En generisk CV-generator.
-- Et projekt med flotte tekster, men tynd profilforståelse.
-- Et scope-creep projekt med for mange sidefunktioner før kerneværdi er bevist.
+- Et AI-drevet ekspertpanel — ikke en chatbot, ikke en formular
+- Denmark-first og Danish-first
+- Et kontrolleret workflow-produkt med høj beslutningskvalitet
+- Et produkt der forstår mennesker på tværs af alle lag i samfundet
+- Et produkt med tydelig adskillelse mellem personlig profil og teknisk AI-profil
+
+## Hvad JobPilot aldrig må blive
+
+- En generisk CV-generator
+- Et produkt med flotte tekster men tynd profilforståelse
+- Et produkt der kun validerer brugeren ukritisk
+- Et scope-creep projekt med sidefunktioner før kerneværdi er bevist
+- Et produkt der kun henvender sig til akademikere og digitalt kompetente brugere
 
 ## V1 user journey (forventet flow)
 1. Bruger lander på produktet.
@@ -37,6 +65,26 @@ V1 behøver ikke levere alle senere moduler fuldt ud. V1 skal bevise, at kerne-l
 - JobPilot må ikke skubbe brugere mod promotion, ledelse eller karriereskifte som default.
 - JobPilot skal holde personlig profil og teknisk AI-profil adskilt.
 - JobPilot skal være Danish-first og Denmark-first i V1.
+
+## Idéklassifikation — fast arbejdsramme
+
+Nye idéer klassificeres altid som:
+- **now** — i aktiv scope, skal laves nu
+- **MVP** — skal med i V1 men ikke nødvendigvis nu
+- **later** — post-V1, hører i FUTURE_IDEA_BACKLOG.md
+- **parked** — undersøges nærmere før beslutning
+- **scope creep** — må ikke påvirke V1-fokus
+
+## Evidenshierarki — hvad systemet skelner mellem
+
+Self-claim er input, ikke bevis. Systemet skelner altid mellem:
+- Fakta — verificerbare oplysninger
+- Bruger-claims — hvad brugeren siger om sig selv
+- Dokumenteret erfaring — hvad der fremgår af dokumentation
+- Konkret evidens — specifikke eksempler med ansvar og resultat
+- Mønstre — gentagne signaler på tværs af samtalen
+- Hypoteser — arbejdshypoteser med eksplicit usikkerhed
+- Mismatch-signaler — hvor profil og mål ikke matcher
 
 ## Setup/onboarding-krav i V1
 - Basisoplysninger skal være kompakte og overskuelige.

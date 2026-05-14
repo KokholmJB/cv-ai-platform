@@ -42,3 +42,12 @@
 ## Lag 2 implementation (godkendt 2026-05-14)
 28. Lag 2 AI-sti implementeres bag feature flag `ENABLE_AI_COMPLETION_ANALYSIS=true`. Default er false — regelbaseret completionAnalysis er produktionsstien indtil benchmark validerer AI-stien. Feature-flag ryddes når AI-stien er valideret i M2.
 29. `AuthenticityProfile` er syntetiseret felt i `CompletionAnalysis` (ikke direkte fra profileModel). Det er output af Lag 2's aggregering af `authenticitySignals` fra alle svar. Lag 3 vil i M2 udvide dette til fuldt autenticitets- og værdimatch.
+
+## Vision og målsætning (godkendt 2026-05-12)
+30. Ekspertpanel-vision godkendt som overordnet produktvision. JobPilot er et AI-drevet ekspertpanel af specialister der arbejder sammen om at maksimere brugerens jobchance. (Godkendt Session 2, 2026-05-12)
+31. Overordnet kvalitetsmål: 50%+ dokumenteret samtalechance for brugere der følger systemets anbefalinger. (Godkendt Session 2, 2026-05-12)
+32. North Star metric: Interview rate per qualified application. Får brugeren flere relevante samtaler ud af færre men bedre valgte ansøgninger? (Godkendt Session 2, 2026-05-12)
+33. Lag 0 dokument-analyse er arkitekturkrav. Interviewet må ikke starte fra nul — det starter fra analyseret dokumentation. (Godkendt Session 2, 2026-05-12)
+34. Kvalitetsløft-filter godkendt som fast arbejdsprincip: Løfter det brugerens jobchance markant? Er brugerværdien større end implementeringsomkostningen? Passer det ind i ekspertpanel-visionen? Kan det måles? (Godkendt Session 2, 2026-05-12)
+35. Idéklassifikation indføres som fast arbejdsramme: now / MVP / later / parked / scope creep. (Godkendt Session 2, 2026-05-12)
+36. JobPilot henvender sig til alle lag i samfundet — ikke kun akademikere og digitalt kompetente brugere. Radikal inklusivitet er et hårdt designkrav. (Godkendt Session 2, 2026-05-12)
