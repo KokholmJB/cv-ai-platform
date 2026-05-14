@@ -206,6 +206,9 @@ type CredibilitySignalsAnalysis = {
   consistency: "high" | "medium" | "low";
   identifiedContradictions: string[];
   claimsWithoutSupportingEvidence: string[];
+  contradictionMarkers?: string[];
+  evidenceVsClaimsGap?: "significant" | "moderate" | "minimal";
+  emotionalLoad?: "high" | "moderate" | "low";
 };
 
 type RecruitmentLogicType =
@@ -236,6 +239,8 @@ type LifestyleProfileAnalysis = {
   };
   lifestyleFit: "good_fit" | "potential_mismatch" | "unclear";
   sustainabilityRisk: "low" | "medium" | "high";
+  economicConstraints?: string[];
+  workloadHistory?: "high" | "moderate" | "low" | "unclear";
 };
 
 type EvidenceClassification =
@@ -270,6 +275,14 @@ type AuthenticityProfile = {
   coreValueAnchors: string[];
   naturalVoiceMarkers: string[];
   authenticityConfidence: "high" | "medium" | "low";
+  passionIndicators?: string[];
+  valueAnchors?: string[];
+};
+
+type InterviewReadinessAnalysis = {
+  overall: "ready" | "needs_preparation" | "significant_gaps";
+  vulnerabilities: string[];
+  criticalRecommendations?: string[];
 };
 
 type CompletionAnalysis = {
@@ -285,7 +298,7 @@ type CompletionAnalysis = {
   communicationProfile: CommunicationProfileAnalysis;
   hiddenStrengths: string[];
   energyConditions: { peaksAt: string[]; strugglesAt: string[] };
-  interviewReadiness: { overall: "ready" | "needs_preparation" | "significant_gaps"; vulnerabilities: string[] };
+  interviewReadiness: InterviewReadinessAnalysis;
   authenticityProfile: AuthenticityProfile;
 };
 
