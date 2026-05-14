@@ -2878,33 +2878,49 @@ async function buildAICompletionAnalysis({
   }
   const narrowedApiKey: string = apiKey;
 
-  const interviewHistory = (interviewState.recentQuestions ?? []).slice(-10);
+  const interviewHistory = (interviewState.recentQuestions ?? []).slice(-6);
   const authSignals = profileModel.authenticitySignals;
 
   const systemPrompt = [
-    "Du er JobPilots Lag 2-profileringssystem. Du analyserer akkumulerede interviewobservationer og finder mønstre på tværs af fem dimensioner: faglig profil, adfærdsmønster, kommunikationsprofil, livsstilsprofil og rekrutteringslogik.",
-    "Du er specifik og evidensbaseret. Du bruger aldrig generiske vendinger der kunne gælde enhver ansøger.",
-    "Alle string-felter returneres på dansk.",
-    "Du returnerer altid det præcise JSON-format defineret i værktøjet — intet andet.",
+    "Du er JobPilots Lag 2-profileringssystem — del af et AI-drevet ekspertpanel der analyserer jobsøgere for at maksimere deres reelle samtalechance.",
+    "Du analyserer akkumulerede interviewobservationer og producerer en struktureret profilanalyse på tværs af alle 14 felter:",
+    "communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals, recruitmentLogic, behaviorProfile, lifestyleProfile, evidenceProfile, communicationProfile, hiddenStrengths, energyConditions, interviewReadiness, authenticityProfile.",
+    "REGLER:",
+    "(1) Vær specifik og evidensbaseret — brug kun information der faktisk fremgår af profilen. Brug aldrig generiske sætninger der kunne gælde enhver ansøger (fx 'god kommunikatør', 'erfaren fagperson', 'motiveret kandidat').",
+    "(2) Alle string-værdier returneres på dansk.",
+    "(3) Brug authenticitySignals aktivt til authenticityProfile: passionIndicators → dominantPassions (konkrete fraser), valueAnchors → coreValueAnchors, authenticVoiceMarkers → naturalVoiceMarkers. Sæt authenticityConfidence til 'high' hvis passionIndicators.length >= 3 og valueAnchors.length >= 2.",
+    "(4) Adskil fakta fra fortolkninger. Brug 'unclear' kun når data faktisk er utilstrækkelig — foretrækker en funderet inference.",
+    "(5) Brug interviewCoverage og evidenceCounts til at vurdere evidenceStrengthVsGoal og interviewReadiness præcist.",
+    "(6) Du returnerer altid det præcise JSON-format defineret i værktøjet — intet andet.",
   ].join(" ");
 
   const userContent = JSON.stringify({
     profileDraft,
     profileSummaryCore: profileSummary?.aiProfileCore ?? null,
-    facts: profileModel.facts.slice(0, 6),
-    interpretations: profileModel.interpretations.slice(0, 6),
+    facts: profileModel.facts.slice(0, 8),
+    interpretations: profileModel.interpretations.slice(0, 8),
     uncertainties: profileModel.uncertainties.slice(0, 5),
-    hypotheses: profileModel.hypotheses.slice(0, 4).map((h) => ({
+    hypotheses: profileModel.hypotheses.slice(0, 5).map((h) => ({
       key: h.key,
       statement: h.statement,
       supportLevel: h.supportLevel,
       confidence: h.confidence,
+      contradictionLevel: h.contradictionLevel,
+      unresolved: h.unresolved,
     })),
     communicationSignals: profileModel.communicationSignals,
-    authenticitySignals: authSignals ?? null,
+    authenticitySignals: authSignals
+      ? {
+          passionIndicators: authSignals.passionIndicators,
+          valueAnchors: authSignals.valueAnchors,
+          authenticVoiceMarkers: authSignals.authenticVoiceMarkers,
+          _note: "Brug disse direkte: passionIndicators → dominantPassions, valueAnchors → coreValueAnchors, authenticVoiceMarkers → naturalVoiceMarkers.",
+        }
+      : null,
+    interviewCoverage: interviewState.coverage,
+    evidenceCounts: interviewState.evidenceCounts,
+    answeredTurns: interviewState.answeredTurns,
     recentQuestions: interviewHistory,
-    instruction:
-      "Analysér profilen og identificer mønstre på tværs af alle dimensioner. Brug kun information der faktisk fremgår — intet generisk. Alle string-felter på dansk.",
   });
 
   const toolSchema = {
@@ -2971,6 +2987,9 @@ async function buildAICompletionAnalysis({
             consistency: { type: "string", enum: ["high", "medium", "low"] },
             identifiedContradictions: { type: "array", items: { type: "string" } },
             claimsWithoutSupportingEvidence: { type: "array", items: { type: "string" } },
+            contradictionMarkers: { type: "array", items: { type: "string" } },
+            evidenceVsClaimsGap: { type: "string", enum: ["significant", "moderate", "minimal"] },
+            emotionalLoad: { type: "string", enum: ["high", "moderate", "low"] },
           },
         },
         recruitmentLogic: {
@@ -3014,6 +3033,8 @@ async function buildAICompletionAnalysis({
             },
             lifestyleFit: { type: "string", enum: ["good_fit", "potential_mismatch", "unclear"] },
             sustainabilityRisk: { type: "string", enum: ["low", "medium", "high"] },
+            workloadHistory: { type: "string", enum: ["high", "moderate", "low", "unclear"] },
+            economicConstraints: { type: "array", items: { type: "string" } },
           },
         },
         evidenceProfile: {
@@ -3060,6 +3081,7 @@ async function buildAICompletionAnalysis({
           properties: {
             overall: { type: "string", enum: ["ready", "needs_preparation", "significant_gaps"] },
             vulnerabilities: { type: "array", items: { type: "string" } },
+            criticalRecommendations: { type: "array", items: { type: "string" } },
           },
         },
         authenticityProfile: {
@@ -3088,8 +3110,8 @@ async function buildAICompletionAnalysis({
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-5",
-          max_tokens: 2000,
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 3000,
           system: systemPrompt,
           tools: [toolSchema],
           tool_choice: { type: "tool", name: "analyze_profile_completion" },
@@ -5145,6 +5167,35 @@ export async function POST(request: Request) {
   }
 
   const payload = body as Record<string, unknown>;
+
+  // Lag 2 test mode: POST { phase: "_test_lag2", profileModel, profileDraft, interviewState? }
+  // Returns raw buildAICompletionAnalysis() output. Non-production only.
+  if (payload.phase === "_test_lag2") {
+    if (process.env.NODE_ENV === "production") {
+      return errorResponse("Not available in production.");
+    }
+    const rawModel = payload.profileModel;
+    const rawDraft = payload.profileDraft;
+    if (!rawModel || typeof rawModel !== "object" || Array.isArray(rawModel)) {
+      return errorResponse("_test_lag2 requires profileModel object.");
+    }
+    if (!rawDraft || typeof rawDraft !== "object" || Array.isArray(rawDraft)) {
+      return errorResponse("_test_lag2 requires profileDraft object.");
+    }
+    const testProfileModel = rawModel as InterviewProfileModel;
+    const testProfileDraft = rawDraft as ProfileDraft;
+    const testInterviewState = normalizeInterviewState(payload.interviewState);
+    try {
+      const result = await buildAICompletionAnalysis({
+        profileModel: testProfileModel,
+        profileDraft: testProfileDraft,
+        interviewState: testInterviewState,
+      });
+      return Response.json({ ok: true, completionAnalysis: result, _test: true });
+    } catch (err) {
+      return errorResponse(`buildAICompletionAnalysis threw: ${String(err)}`);
+    }
+  }
 
   if (payload.phase !== "initial") {
     return errorResponse("Invalid phase.");
