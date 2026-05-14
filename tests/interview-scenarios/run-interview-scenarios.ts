@@ -516,6 +516,56 @@ function analyzeCompletionQuality({
         }
       }
     }
+
+    // Field-specific forbidden value: "unknown" for new optional enum subfields
+    const fieldSpecificForbidden: [string, string][] = [
+      ["credibilitySignals", "evidenceVsClaimsGap"],
+      ["credibilitySignals", "emotionalLoad"],
+      ["lifestyleProfile", "workloadHistory"],
+    ];
+    for (const [parentField, subField] of fieldSpecificForbidden) {
+      const parent = completionAnalysis[parentField];
+      if (parent !== null && typeof parent === "object" && !Array.isArray(parent)) {
+        const val = (parent as Record<string, unknown>)[subField];
+        if (val === "unknown") {
+          qualityWarnings.push(`generic_string_value:${parentField}.${subField}:unknown`);
+        }
+      }
+    }
+
+    // Targeted subfield structure checks for new optional fields
+    const credibility = completionAnalysis["credibilitySignals"];
+    if (credibility !== null && typeof credibility === "object" && !Array.isArray(credibility)) {
+      const cs = credibility as Record<string, unknown>;
+      if ("contradictionMarkers" in cs && !Array.isArray(cs["contradictionMarkers"])) {
+        qualityWarnings.push("field_not_array:credibilitySignals.contradictionMarkers");
+      }
+      if ("evidenceVsClaimsGap" in cs && cs["evidenceVsClaimsGap"] === "") {
+        qualityWarnings.push("empty_subfield:credibilitySignals.evidenceVsClaimsGap");
+      }
+      if ("emotionalLoad" in cs && cs["emotionalLoad"] === "") {
+        qualityWarnings.push("empty_subfield:credibilitySignals.emotionalLoad");
+      }
+    }
+
+    const interviewReadiness = completionAnalysis["interviewReadiness"];
+    if (interviewReadiness !== null && typeof interviewReadiness === "object" && !Array.isArray(interviewReadiness)) {
+      const ir = interviewReadiness as Record<string, unknown>;
+      if ("criticalRecommendations" in ir && !Array.isArray(ir["criticalRecommendations"])) {
+        qualityWarnings.push("field_not_array:interviewReadiness.criticalRecommendations");
+      }
+    }
+
+    const lifestyle = completionAnalysis["lifestyleProfile"];
+    if (lifestyle !== null && typeof lifestyle === "object" && !Array.isArray(lifestyle)) {
+      const ls = lifestyle as Record<string, unknown>;
+      if ("economicConstraints" in ls && !Array.isArray(ls["economicConstraints"])) {
+        qualityWarnings.push("field_not_array:lifestyleProfile.economicConstraints");
+      }
+      if (scenario.intendedDirectionType !== "unclear" && ls["workloadHistory"] === "unclear") {
+        qualityWarnings.push("generic_string_value:lifestyleProfile.workloadHistory:unclear");
+      }
+    }
   }
 
   return {
@@ -793,6 +843,40 @@ function runDiversityCheck(results: ScenarioResult[]) {
   }
 }
 
+function runSubfieldDiversityCheck(results: ScenarioResult[]) {
+  const subfieldsToTrack: [string, string][] = [
+    ["credibilitySignals", "evidenceVsClaimsGap"],
+    ["credibilitySignals", "emotionalLoad"],
+    ["lifestyleProfile", "workloadHistory"],
+  ];
+
+  const completed = results.filter((r) => r.completionAnalysisSnapshot !== null);
+  if (completed.length === 0) return;
+
+  for (const [parentField, subField] of subfieldsToTrack) {
+    const valueCounts = new Map<string, number>();
+
+    for (const result of completed) {
+      const parent = result.completionAnalysisSnapshot?.[parentField];
+      if (parent !== null && typeof parent === "object" && !Array.isArray(parent)) {
+        const val = (parent as Record<string, unknown>)[subField];
+        if (val !== undefined) {
+          const serialized = JSON.stringify(val);
+          valueCounts.set(serialized, (valueCounts.get(serialized) ?? 0) + 1);
+        }
+      }
+    }
+
+    for (const [value, count] of valueCounts.entries()) {
+      if (count >= 8) {
+        console.log(
+          `[diversity] Subfield "${parentField}.${subField}" identical across ${count} scenarios: ${value}`,
+        );
+      }
+    }
+  }
+}
+
 function runAuthenticityDiversityCheck(results: ScenarioResult[]) {
   const completed = results.filter((r) => r.completionAnalysisSnapshot !== null);
   if (completed.length === 0) return;
@@ -830,6 +914,7 @@ async function main() {
 
   printSummary(results);
   runDiversityCheck(results);
+  runSubfieldDiversityCheck(results);
   runAuthenticityDiversityCheck(results);
 
   if (results.some((result) => result.status === "FAIL")) {
