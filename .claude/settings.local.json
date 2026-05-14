@@ -1,12 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm.cmd run *)",
-      "Bash(git *)",
-      "Bash(Get-Content *)",
-      "Bash(Set-Content *)",
-      "Bash(Get-ChildItem *)",
-      "Bash(node *)",
       "Bash(**)"
     ]
   }
