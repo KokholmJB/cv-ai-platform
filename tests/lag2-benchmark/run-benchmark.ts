@@ -3,8 +3,8 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { interviewScenarios } from "../interview-scenarios/scenarios";
-import type { InterviewScenario } from "../interview-scenarios/scenarios";
+import { interviewScenarios } from "../interview-scenarios/scenarios.ts";
+import type { InterviewScenario } from "../interview-scenarios/scenarios.ts";
 
 // ── env ───────────────────────────────────────────────────────────────────────
 
