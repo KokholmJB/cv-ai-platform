@@ -2878,28 +2878,173 @@ async function buildAICompletionAnalysis({
   }
   const narrowedApiKey: string = apiKey;
 
-  const interviewHistory = (interviewState.recentQuestions ?? []).slice(-6);
+  const interviewHistory = (interviewState.recentQuestions ?? []).slice(-8);
   const authSignals = profileModel.authenticitySignals;
+  const targetKind = inferTargetProfileKind(profileDraft);
 
-  const systemPrompt = [
-    "Du er JobPilots Lag 2-profileringssystem — del af et AI-drevet ekspertpanel der analyserer jobsøgere for at maksimere deres reelle samtalechance.",
-    "Du analyserer akkumulerede interviewobservationer og producerer en struktureret profilanalyse på tværs af alle 14 felter:",
-    "communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals, recruitmentLogic, behaviorProfile, lifestyleProfile, evidenceProfile, communicationProfile, hiddenStrengths, energyConditions, interviewReadiness, authenticityProfile.",
-    "REGLER:",
-    "(1) Vær specifik og evidensbaseret — brug kun information der faktisk fremgår af profilen. Brug aldrig generiske sætninger der kunne gælde enhver ansøger (fx 'god kommunikatør', 'erfaren fagperson', 'motiveret kandidat').",
-    "(2) Alle string-værdier returneres på dansk.",
-    "(3) Brug authenticitySignals aktivt til authenticityProfile: passionIndicators → dominantPassions (konkrete fraser), valueAnchors → coreValueAnchors, authenticVoiceMarkers → naturalVoiceMarkers. Sæt authenticityConfidence til 'high' hvis passionIndicators.length >= 3 og valueAnchors.length >= 2.",
-    "(4) Adskil fakta fra fortolkninger. Brug 'unclear' kun når data faktisk er utilstrækkelig — foretrækker en funderet inference.",
-    "(5) Brug interviewCoverage og evidenceCounts til at vurdere evidenceStrengthVsGoal og interviewReadiness præcist.",
-    "(6) Du returnerer altid det præcise JSON-format defineret i værktøjet — intet andet.",
-  ].join(" ");
+  const systemPrompt = `Du er JobPilots Lag 2-profileringssystem — del af et AI-drevet ekspertpanel der analyserer jobsøgere.
+
+KRITISKE REGLER DU ALDRIG MÅ BRYDE:
+- Antag ALDRIG at brugeren vil have mere ansvar eller højere titel medmindre der er eksplicit evidens for det
+- Hvis targetKind er 'less_responsibility' → ambitionProfile SKAL være 'less_responsibility' — ingen undtagelse
+- Hvis targetKind er 'same_track' ELLER 'same_track_better_conditions' → ambitionProfile SKAL være 'better_conditions' — ingen undtagelse
+- Hvis targetKind er 'specialist_track' → naturalTeamRole SKAL være 'specialist' — ingen undtagelse
+- Returner ALDRIG 'unclear' for ambitionProfile, naturalTeamRole eller workIntensityPreference hvis targetKind er known (dvs. ikke 'unclear')
+- Returner ALDRIG 'chemistry_and_fit' som default recruitmentLogic — KUN til startup/kultur-stillinger med eksplicit evidens
+- Returner ALDRIG identiske communicationProfile-svar til alle brugere — basér UDELUKKENDE på de faktiske communicationSignals
+
+VIGTIGT: targetKind er det vigtigste signal i analysen. Map direkte fra targetKind — lad det aldrig overrides af andre signaler medmindre targetKind selv er 'unclear'.
+
+FELTSPECIFIKKE REGLER:
+
+ambitionProfile — map DIREKTE fra targetKind — ingen undtagelse, ingen fortolkning:
+  next_level → 'upward'
+  less_responsibility → 'less_responsibility'
+  same_track → 'better_conditions'
+  same_track_better_conditions → 'better_conditions'
+  direction_change → 'lateral'
+  product_transition → 'lateral'
+  specialist_track → 'lateral'
+  unclear → brug evidens fra svarene, men præfer en konkret værdi frem for 'unclear'
+
+naturalTeamRole — map fra targetKind og signaler:
+  specialist_track → ALTID 'specialist'
+  next_level med ledelsesindikator (leder/chef/head of i currentRole eller targetDirection) → 'initiator'
+  tværgående koordination eller projektledelse-signaler → 'coordinator'
+  same_track/same_track_better_conditions uden ledelse → 'executor'
+  Returner IKKE 'unclear' hvis targetKind er known — vælg nærmest passende
+
+workIntensityPreference — map fra targetKind:
+  less_responsibility / same_track / same_track_better_conditions → 'steady'
+  next_level uden burnout-signaler → 'high'
+  direction_change / product_transition / specialist_track → 'moderate'
+  Returner IKKE 'unclear' hvis targetKind er known — vælg nærmest passende
+
+recruitmentLogic — map fra targetKind:
+  same_track / same_track_better_conditions → 'cv_and_experience'
+  next_level med ledelseserfaring → 'documented_results'
+  specialist_track → 'academic_and_structured'
+  service/salg/hr/relationer i currentRole eller targetDirection → 'personality_and_culture'
+  Returner ALDRIG 'chemistry_and_fit' som default — KUN til startup/stærk kultur-fit med eksplicit signal i svarene
+
+communicationProfile:
+  Basér UDELUKKENDE på communicationSignals i inputtet:
+    selfPromotionComfort: 'undersells' hvis possibleSelfMinimizingLanguage=true, 'balanced' ellers
+    languageNormalization: 'minimizes' hvis korte/beskedne svar, 'overstates' hvis grandiøse påstande uden belæg, 'neutral' ellers
+    credibilityInConversation: 'strong' hvis høj evidenceDensity og strukturerede svar, 'weak' hvis lav evidenceDensity, 'moderate' ellers
+  Identisk svar til alle brugere er en fejl — tilpas til DENNE brugers specifikke signaler
+
+authenticityProfile:
+  Brug authenticitySignals direkte — kopier indholdet præcist
+  Hvis passionIndicators ikke er tom → dominantPassions SKAL indeholde dem (maks 3)
+  Hvis valueAnchors ikke er tom → coreValueAnchors SKAL indeholde dem (maks 3)
+  Hvis authenticVoiceMarkers ikke er tom → naturalVoiceMarkers SKAL indeholde dem (maks 5)
+  authenticityConfidence: 'high' hvis passionIndicators.length >= 3 OG valueAnchors.length >= 2
+  authenticityConfidence: 'medium' hvis passionIndicators.length >= 1 ELLER valueAnchors.length >= 1
+  authenticityConfidence: 'low' KUN hvis begge er tomme
+
+PÅKRÆVET JSON-SCHEMA — returner præcist dette format via tool analyze_profile_completion:
+{
+  "communicationStyle": {
+    "answerLength": "short" | "medium" | "narrative",
+    "abstractionLevel": "concrete" | "conceptual",
+    "selfReferences": "active_i" | "distancing_we",
+    "tone": "direct" | "exploratory"
+  },
+  "recruitmentFit": {
+    "communicationStyleMatchToRecruitmentExpectations": "<dansk streng specifik til denne bruger>",
+    "likelyUnderseller": true | false
+  },
+  "strengthGaps": {
+    "explicitlyMentionedStrengths": ["<dansk>"],
+    "implicitStrengthsFromExamples": ["<dansk>"],
+    "discrepancyConfidence": "medium" | "low"
+  },
+  "energyMap": {
+    "energizers": ["<dansk — specifik til denne bruger>"],
+    "drainers": ["<dansk — specifik til denne bruger>"]
+  },
+  "credibilitySignals": {
+    "consistency": "high" | "medium" | "low",
+    "identifiedContradictions": ["<dansk>"],
+    "claimsWithoutSupportingEvidence": ["<dansk>"]
+  },
+  "recruitmentLogic": {
+    "type": "cv_and_experience" | "portfolio_and_proof" | "personality_and_culture" | "chemistry_and_fit" | "documented_results" | "academic_and_structured",
+    "confidence": "high" | "medium" | "low"
+  },
+  "behaviorProfile": {
+    "behaviorUnderPressure": "problem_solver" | "withdraws" | "seeks_support" | "takes_control" | "unclear",
+    "naturalTeamRole": "initiator" | "executor" | "coordinator" | "specialist" | "unclear",
+    "decisionStyle": "analytical" | "intuitive" | "consensus_seeking" | "action_oriented",
+    "ambitionProfile": "upward" | "lateral" | "less_responsibility" | "better_conditions" | "unclear",
+    "selfImageGap": {
+      "likelySeverity": "low" | "medium" | "high",
+      "signals": ["<dansk — konkrete signaler fra svarene>"]
+    }
+  },
+  "lifestyleProfile": {
+    "workIntensityPreference": "high" | "moderate" | "steady" | "unclear",
+    "flexibilityNeeds": {
+      "workLocation": "remote" | "hybrid" | "onsite" | "unclear",
+      "scheduleFlexibility": "high" | "moderate" | "low" | "unclear"
+    },
+    "lifestyleFit": "good_fit" | "potential_mismatch" | "unclear",
+    "sustainabilityRisk": "low" | "medium" | "high"
+  },
+  "evidenceProfile": {
+    "evidenceClassification": [
+      { "strength": "<dansk>", "classification": "user_claim" | "concrete_example" | "proven_responsibility" | "measurable_result" | "pattern" }
+    ],
+    "evidenceStrengthVsGoal": "sufficient" | "borderline" | "insufficient",
+    "transferableStrengths": ["<dansk>"]
+  },
+  "communicationProfile": {
+    "selfPromotionComfort": "undersells" | "balanced" | "oversells",
+    "recruitmentFormatVulnerabilities": ["structured_competency" | "case_interview" | "presentation" | "small_talk" | "none_identified"],
+    "credibilityInConversation": "strong" | "moderate" | "weak",
+    "languageNormalization": "minimizes" | "neutral" | "overstates"
+  },
+  "hiddenStrengths": ["<dansk — styrker brugeren ikke selv fremhæver>"],
+  "energyConditions": {
+    "peaksAt": ["<dansk>"],
+    "strugglesAt": ["<dansk>"]
+  },
+  "interviewReadiness": {
+    "overall": "ready" | "needs_preparation" | "significant_gaps",
+    "vulnerabilities": ["<dansk>"]
+  },
+  "authenticityProfile": {
+    "dominantPassions": ["<dansk — fra passionIndicators>"],
+    "coreValueAnchors": ["<dansk — fra valueAnchors>"],
+    "naturalVoiceMarkers": ["<dansk — fra authenticVoiceMarkers>"],
+    "authenticityConfidence": "high" | "medium" | "low"
+  }
+}
+
+Alle string-værdier returneres på dansk. Du returnerer altid det præcise JSON-format defineret i værktøjet — intet andet.`;
 
   const userContent = JSON.stringify({
-    profileDraft,
-    profileSummaryCore: profileSummary?.aiProfileCore ?? null,
+    targetKind,
+    profileDraft: {
+      currentRole: profileDraft.currentRole ?? null,
+      targetDirection: profileDraft.targetDirection ?? null,
+      yearsExperience: profileDraft.yearsExperience ?? null,
+    },
+    communicationSignals: profileModel.communicationSignals,
+    authenticitySignals: authSignals
+      ? {
+          passionIndicators: authSignals.passionIndicators,
+          valueAnchors: authSignals.valueAnchors,
+          authenticVoiceMarkers: authSignals.authenticVoiceMarkers,
+        }
+      : { passionIndicators: [], valueAnchors: [], authenticVoiceMarkers: [] },
+    evidenceCounts: interviewState.evidenceCounts,
+    interviewCoverage: interviewState.coverage,
+    answeredTurns: interviewState.answeredTurns,
+    recentQuestions: interviewHistory,
     facts: profileModel.facts.slice(0, 8),
     interpretations: profileModel.interpretations.slice(0, 8),
-    uncertainties: profileModel.uncertainties.slice(0, 5),
     hypotheses: profileModel.hypotheses.slice(0, 5).map((h) => ({
       key: h.key,
       statement: h.statement,
@@ -2908,19 +3053,8 @@ async function buildAICompletionAnalysis({
       contradictionLevel: h.contradictionLevel,
       unresolved: h.unresolved,
     })),
-    communicationSignals: profileModel.communicationSignals,
-    authenticitySignals: authSignals
-      ? {
-          passionIndicators: authSignals.passionIndicators,
-          valueAnchors: authSignals.valueAnchors,
-          authenticVoiceMarkers: authSignals.authenticVoiceMarkers,
-          _note: "Brug disse direkte: passionIndicators → dominantPassions, valueAnchors → coreValueAnchors, authenticVoiceMarkers → naturalVoiceMarkers.",
-        }
-      : null,
-    interviewCoverage: interviewState.coverage,
-    evidenceCounts: interviewState.evidenceCounts,
-    answeredTurns: interviewState.answeredTurns,
-    recentQuestions: interviewHistory,
+    uncertainties: profileModel.uncertainties.slice(0, 5),
+    profileSummaryCore: profileSummary?.aiProfileCore ?? null,
   });
 
   const toolSchema = {
