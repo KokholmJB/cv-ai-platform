@@ -600,4 +600,257 @@ export const interviewScenarios: InterviewScenario[] = [
       },
     },
   },
+  {
+    id: "passion-strong-craftsperson",
+    label: "Passion-driven restoration craftsman",
+    profileDraft: {
+      name: "Soeren",
+      currentRole: "Toemrer",
+      yearsExperience:
+        "17 aar som toemrer. Jeg elsker arbejdet med fredede og historiske bygninger og braender for at bevare gammelt haandvaerk og originale materialer. Har frivilligt restaureret fredede gaarde og kirker i fritiden.",
+      targetDirection:
+        "Mere restaureringsarbejde og mindre nybyggeri. Det giver mig mening at bygge noget der holder i hundrede aar. Det er vigtigt for mig at arbejde med kvalitet frem for hastighed, og jeg vil ikke acceptere pladser der bare vil have det billigste og hurtigste.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["leadership", "management", "office_role"],
+    scriptedAnswers: {
+      default:
+        "Restaurering er ikke bare et job for mig — det er noget jeg virkelig tror paa. Jeg husker foerste gang jeg arbejdede paa en fredet bygning. Der laerte jeg hvad haandvaerk egentlig er: at respektere materialet og forstaa bygningens logik. Det er det jeg er god til og det jeg vil have mere af.",
+      byFamily: {
+        current_work_reality:
+          "Normalt er det standard renovering og nybyggeri, men det er restaureringsopgaverne der giver mig energi. Jeg maerkede det tydeligt da jeg sad med originale bindingsvaerksbjælker — den slags kraever kendskab til materialer og teknikker de fleste ikke laengere ved noget om.",
+        resultEvidence:
+          "Et konkret eksempel: jeg stod med en fredet laden hvor hele tagkonstruktionen skulde bevares med originalmetoden. Jeg skaffede det rigtige egetraee og genopbyggede samlingerne. Det betod noget — bygningen staar nu og vil staa i hundrede aar mere.",
+        mismatch_risk:
+          "Et daarligt match er steder der vil have mig til at skynde mig og skjaere hjoerner. Det er en fornaevning mod haandvaerket. Jeg valgte mit fag fordi det betyder noget at goere det rigtigt.",
+      },
+    },
+    expectedSignals: [
+      "restoration passion",
+      "quality over speed",
+      "authentic craft motivation",
+      "not management or office",
+    ],
+    loopFamiliesToWatch: ["current_work_reality", "resultEvidence", "mismatch_risk"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["restaurering", "haandvaerk", "fredede", "toemrer", "materialer"],
+      minimumMatchedConcepts: 3,
+      expectedFieldSignals: {
+        authenticityProfile: {
+          required: true,
+          requiredSubfields: ["dominantPassions", "coreValueAnchors", "naturalVoiceMarkers"],
+          expectedPatterns: [
+            /elsker|braender for|giver mig mening/,
+            /vigtigt for mig|vil ikke acceptere/,
+          ],
+        },
+      },
+    },
+  },
+  {
+    id: "value-anchored-teacher-leaving",
+    label: "Value-anchored teacher leaving the school system",
+    profileDraft: {
+      name: "Stine",
+      currentRole: "Folkeskolelaerer",
+      yearsExperience:
+        "14 aar som folkeskolelaerer i grundskolen. Braender for boerns laering og udvikling, men er engageret i alternative og mere individuelle tilgange. Foeler sig begrænset af testregimer og mangel paa tid til det enkelte barn.",
+      targetDirection:
+        "Ud af folkeskolen, men ikke ud af undervisning og laering. Det giver mig mening at hjaelpe mennesker laere paa en maade der virker for dem. Det er vigtigt for mig at have faglig autonomi. Jeg vil ikke acceptere roller der bare kraever at jeg eksekverer andres systemer uden at taenke selv.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: ["return_to_school", "standardized_teaching", "management"],
+    scriptedAnswers: {
+      default:
+        "Jeg elsker det oejeblik noget klikker for et barn — det er det jeg er god til, og det giver mig mening. Jeg husker en elev der blomstrede da jeg tilpassede min tilgang — der laerte jeg hvad undervisning egentlig er. Folkeskolen lader mig ikke goere det ordentligt laengere. Det betod meget for mig da jeg maerkede det — og det er der jeg valgte at finde noget andet.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder med stramt styrede processer og ingen faglig autonomi. Jeg valgte laererfaget fordi jeg ville goere en forskel — ikke administrere laeringsprocesser. Det er ikke forhandleligt for mig.",
+        current_work_reality:
+          "Min hverdag er klasseundervisning, forberedelse og testrapporter. Jeg maerkede for tre aar siden at jeg bruger mere tid paa dokumentation end paa boernene. Det skete gradvist — og nu er jeg faerdig med det system.",
+        resultEvidence:
+          "Jeg husker en dreng der var ved at miste interessen for skolen. Jeg stod med situationen og valgte at tilpasse undervisningen til hans interesse. Der laerte jeg at det er muligt — men systemet braendte mig ud fordi det ikke maa ske konsekvent.",
+      },
+    },
+    expectedSignals: [
+      "passion for learning not the institution",
+      "value anchor autonomy",
+      "value anchor individual attention",
+      "leaving school not vocation",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["laerer", "laering", "folkeskole", "barn", "autonomi"],
+      minimumMatchedConcepts: 3,
+      expectedFieldSignals: {
+        authenticityProfile: {
+          required: true,
+          requiredSubfields: ["dominantPassions", "coreValueAnchors", "naturalVoiceMarkers"],
+          expectedPatterns: [
+            /braender for|elsker|giver mig mening/,
+            /vigtigt for mig|vil ikke acceptere|ikke forhandleligt/,
+          ],
+        },
+      },
+    },
+  },
+  {
+    id: "distinct-voice-creative",
+    label: "Distinct-voice creative professional seeking employment stability",
+    profileDraft: {
+      name: "Tobias",
+      currentRole: "Selvstaendig grafisk designer",
+      yearsExperience:
+        "8 aar som selvstaendig grafisk designer. Jeg elsker designprocessen og har passion for godt visuelt haandvaerk. Har lavet brandidentiteter, infografik og kampagner for kunder i alle stoorrelsesordener.",
+      targetDirection:
+        "Barn paa vej, saa nu vil jeg have noget stabilt. Det giver mig mening at vaere til stede for min familie. Det er vigtigt for mig at oekonomien er forudsigelig. Jeg vil aldrig vil arbejde et sted der bruger design som dekoration uden at forstaa hvad de goer.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: ["freelance_continuation", "leadership", "account_management"],
+    scriptedAnswers: {
+      default:
+        "Jobsoegning er lidt som at date med sit CV — man haaber de kan lide en. Men for at vaere aaben: jeg braender for godt design og det giver mig mening. Jeg husker foerste gang en kunde sagde at mit design aabnede doore for dem — det betod alt. Det er det jeg er god til — ikke hurtigt, men rigtigt.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder der vil have mig til at lave kedelige templates til kedelige formaal. Jeg valgte design som fag fordi det er et haandvaerk. Det er vigtigt for mig at have kreativ medbestemmelse — det er ikke et luksusoenske, det er det der goer arbejdet godt.",
+        current_work_reality:
+          "Som selvstaendig er min hverdag kunder, deadlines og design. Jeg opdagede tidligt at det fedeste er naar et visuelt element loeser et kommunikationsproblem ingen ord kunne. Jeg maerkede at det er der min energi sidder.",
+        resultEvidence:
+          "Jeg stod med et brandingprojekt for en lille virksomhed der var usynlig. Jeg husker vi lavede identiteten fra bunden og det betod at de fik indkommende forespoorgsler. Et konkret eksempel paa at godt design virker — men det kraever at nogen tror paa det.",
+      },
+    },
+    expectedSignals: [
+      "passion for craft",
+      "stability motivation from family",
+      "distinct personal voice",
+      "not templates or decorative work",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 2,
+      requireUncertainties: true,
+      expectedConcepts: ["designer", "design", "kreativ"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        authenticityProfile: {
+          required: true,
+          requiredSubfields: ["dominantPassions", "coreValueAnchors", "naturalVoiceMarkers"],
+          expectedPatterns: [
+            /elsker|braender for|passion|giver mig mening/,
+            /vigtigt for mig|aldrig vil/,
+          ],
+        },
+      },
+    },
+  },
+  {
+    id: "passion-driven-environmental",
+    label: "Passion-driven environmental biologist with hard value anchors",
+    profileDraft: {
+      name: "Frederikke",
+      currentRole: "Biolog og miljoekonsulent",
+      yearsExperience:
+        "7 aar i miljoekonsulentvirksomhed. Braender for biodiversitet og naturgenopretning — det giver mig mening at arbejde med det der bevarer livet paa planeten. Har lavet naturkortlaegning, biodiversitetsanalyse og miljoevurderinger.",
+      targetDirection:
+        "Naeste trin inden for miljoesektoren. Det er det jeg vil bruge resten af min karriere paa. Det er vigtigt for mig at arbejde med rigtig naturbevarelse. Jeg vil ikke acceptere stillinger hos olie, gas eller industriel landbrug — uanset hvad de betaler.",
+    },
+    intendedDirectionType: "same_track",
+    expectedDoNotAssume: ["leave_environment", "accept_any_industry", "management"],
+    scriptedAnswers: {
+      default:
+        "Biodiversitetskrise er ikke bare et ord for mig. Jeg husker jeg som barn fandt en sjælden fugl paa marken — det var det der laerte mig at natur er noget der kan forsvinde hvis ingen passer paa det. Det er det jeg virkelig kan bidrage med. Og jeg braender for det paa en maade der ikke forsvinder.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder der vil bruge min viden til greenwashing. Jeg stod med en situation som den en gang — og jeg valgte at gaae derfra. Det er en fornaevning mod mit fag. Jeg vil ikke acceptere at saelge min ekspertise til industrier der skader det jeg arbejder for at beskytte — olie, gas, industriel landbrug.",
+        current_work_reality:
+          "Min hverdag er feltanalyser, rapporter og dialog med kommuner. Jeg maerkede tydeligt da vi hjalp med at genoprette et vaadlandsomraade — det betod noget at se fugle vende tilbage til marker der havde vaeret tomme i aartier.",
+        resultEvidence:
+          "Et konkret eksempel: jeg stod med en vindmoellecase hvor min analyse viste paavirkning paa en fredet biotoptyype. Jeg valgte at holde fast i mine faglige konklusioner selvom bygherren pressede paa. Der laerte jeg at faglighed ikke er forhandleligt.",
+      },
+    },
+    expectedSignals: [
+      "environmental passion",
+      "hard value anchor against harmful industries",
+      "biodiversity expertise",
+      "not greenwashing",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["biolog", "biodiversitet", "miljoekonsulent", "naturgenopretning", "miljo"],
+      minimumMatchedConcepts: 3,
+      expectedFieldSignals: {
+        authenticityProfile: {
+          required: true,
+          requiredSubfields: ["dominantPassions", "coreValueAnchors", "naturalVoiceMarkers"],
+          expectedPatterns: [
+            /braender for|giver mig mening|det er det jeg/,
+            /vigtigt for mig|vil ikke acceptere/,
+          ],
+        },
+      },
+    },
+  },
+  {
+    id: "freedom-seeking-former-corporate",
+    label: "Autonomy-driven professional returning from freelance to employment",
+    profileDraft: {
+      name: "Ida",
+      currentRole: "Freelance projektleder, tidligere fastansat i stort firma",
+      yearsExperience:
+        "9 aar som projektleder i stor organisation, derefter 4 aar som freelance. Jeg elsker at disponere selv og braender for arbejde der giver reel indflydelse. Trives ikke med mikroledelse og unnoedige processer.",
+      targetDirection:
+        "Tilbage til fast ansaettelse — men kun hvis autonomien er reel. Det giver mig mening at arbejde selvstaendigt inden for rammer. Det er vigtigt for mig at blive behandlet som en voksen der kan disponere selv. Jeg vil ikke acceptere roller med daglig check-in og mikroledelse.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["return_to_high_control", "accept_micromanagement", "management"],
+    scriptedAnswers: {
+      default:
+        "Freelance gav mig smagen for at bestemme selv — og det giver mig mening. Men stabiliteten mangler nu. Jeg vil gerne have begge dele: et job der respekterer min vurdering og lader mig arbejde paa min maade. Det er det jeg er god til — at levere naar jeg har tillid og plads.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er ugentlige statusmøder for alting og altid-tilgaengelig-kulturen. Det er en fornaevning mod min kapacitet som selvstaendig fagperson. Jeg valgte freelance netop fordi jeg ville vaek fra den slags — og jeg vil kun gaa tilbage til noget bedre.",
+        current_work_reality:
+          "Min freelance-hverdag er varierende projekter og direkte klientkontakt. Jeg stod med alt fra strategirapporter til projektledelse. Jeg maerkede tydeligt hvornaar kunder stoler paa mig — resultatet var altid bedre med tillid end med kontrol.",
+        resultEvidence:
+          "Et konkret eksempel: jeg husker et projekt hvor jeg overtog en kaotisk implementering. Der laerte jeg at autoritet ikke kraever en titel — det kraever klarhed. Jeg leverede til tiden og det betod alt for kunden.",
+      },
+    },
+    expectedSignals: [
+      "autonomy as hard requirement",
+      "returning to employment for stability",
+      "not micromanagement",
+      "trust-based working style",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 1,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["freelance", "autonomi", "tillid", "mikroledelse", "projektleder"],
+      minimumMatchedConcepts: 3,
+      expectedFieldSignals: {
+        authenticityProfile: {
+          required: true,
+          requiredSubfields: ["dominantPassions", "coreValueAnchors", "naturalVoiceMarkers"],
+          expectedPatterns: [
+            /elsker|braender for|giver mig mening/,
+            /vigtigt for mig|vil ikke acceptere|kun hvis/,
+          ],
+        },
+      },
+    },
+  },
 ];
