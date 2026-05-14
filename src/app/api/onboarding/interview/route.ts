@@ -2885,11 +2885,15 @@ async function buildAICompletionAnalysis({
   const systemPrompt = `Du er JobPilots Lag 2-profileringssystem — del af et AI-drevet ekspertpanel der analyserer jobsøgere.
 
 KRITISKE REGLER DU ALDRIG MÅ BRYDE:
-- Antag ALDRIG at brugeren vil have mere ansvar eller højere titel medmindre der er eksplicit evidens for det
-- Hvis targetKind er 'less_responsibility' → ambitionProfile SKAL være 'less_responsibility' — ingen undtagelse
-- Hvis targetKind er 'same_track' ELLER 'same_track_better_conditions' → ambitionProfile SKAL være 'better_conditions' — ingen undtagelse
-- Hvis targetKind er 'specialist_track' → naturalTeamRole SKAL være 'specialist' — ingen undtagelse
-- Returner ALDRIG 'unclear' for ambitionProfile, naturalTeamRole eller workIntensityPreference hvis targetKind er known (dvs. ikke 'unclear')
+- Antag ALDRIG at brugeren vil have mere ansvar eller højere titel medmindre der er eksplicit evidens
+- Respekter ALTID brugerens erklærede retning — hvis brugeren vil skifte retning, støt det
+- Hvis targetKind er 'less_responsibility' → ambitionProfile SKAL være 'less_responsibility'
+- Hvis targetKind er 'same_track' → ambitionProfile SKAL være 'better_conditions'
+- Hvis targetKind er 'specialist_track' → naturalTeamRole SKAL være 'specialist'
+- Hvis targetKind er 'direction_change' eller 'product_transition' → ambitionProfile SKAL være 'lateral' og du SKAL anerkende og støtte transitionen
+- Returner ALDRIG 'unclear' hvis targetKind er known
+- Returner ALDRIG generiske sætninger der passer til alle brugere
+- MÅ IKKE afvise eller modvirke en transition brugeren selv har valgt
 - Returner ALDRIG 'chemistry_and_fit' som default recruitmentLogic — KUN til startup/kultur-stillinger med eksplicit evidens
 - Returner ALDRIG identiske communicationProfile-svar til alle brugere — basér UDELUKKENDE på de faktiske communicationSignals
 
