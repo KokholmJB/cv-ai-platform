@@ -14,8 +14,13 @@ Et funktionelt system som rigtige brugere betaler for at bruge. Ledige danske jo
 ## Milepælsplan — 8 uger
 
 ### M1 — Uge 1-2: Profilfundament + Fase 0 arkitektur-forudsætninger
-Interviewmotor dækker alle fem profildimensioner. Profile view model og mapping-lag færdigt. Personlig og teknisk profil adskilt. Benchmark-suite (5-10 scenarier) klar. Vendor-abstraktion og korrektionskontrakt designet.
-Gate: test:interview-scenarios 0 WARN · test:setup-ux-review 0 WARN/FAIL · build grøn · benchmark-suite klar · autenticitetsprofil implementeret
+Interviewmotor dækker alle fem profildimensioner. Profile view model og mapping-lag færdigt. Personlig og teknisk profil adskilt. Benchmark-suite (5-10 scenarier) klar. Vendor-abstraktion og korrektionskontrakt designet. Lag 0 dokument-analyse funktionel — interview starter fra dokumentanalyse, ikke fra nul.
+
+Lag 0 workstream (M1):
+- Lag 0: Dokument-analyse implementeret (CV, uddannelse, certifikater ekstraheret til struktureret profileDraft)
+- Lag 0 output kobles til Lag 1 interview som startpunkt
+
+Gate: test:interview-scenarios 0 WARN · test:setup-ux-review 0 WARN/FAIL · build grøn · benchmark-suite klar · autenticitetsprofil implementeret · Lag 0 dokument-analyse funktionel · interview starter fra dokumentanalyse, ikke fra nul
 
 ### M2 — Uge 2-3: Fire-lags AI pipeline migration + korrektion + persistence
 Fire-lags AI pipeline erstatter regelbaseret completionAnalysis. Lag 1-4 implementeret og valideret mod benchmark. Korrektion (bruger kan rette AI-fortolkninger) implementeret. Persistence for profil og korrektionshistorik klar.
@@ -44,6 +49,7 @@ Gate: alle M1-M6 gates grønne · feedback-flow virker · pilot-tjekliste godken
 ## WBS — Arbejdsnedbrydning
 
 ### 1.0 Interview engine + profilering (I GANG)
+- 1.0 Lag 0: Dokument-analyse (CV, uddannelse, certifikater → struktureret profileDraft)
 - 1.1 Completion gates hærdet ✅
 - 1.2 Profile view model + mapping-lag ✅
 - 1.3 Analyse-lag (communicationStyle, recruitmentFit, strengthGaps, energyMap, credibilitySignals) — I GANG

@@ -1,6 +1,11 @@
 # CURRENT_STATE
 ## Produkt
 JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
+
+## Vision og målsætning
+- Ekspertpanel-vision dokumenteret: JobPilot er et AI-drevet ekspertpanel af specialister der arbejder parallelt om at maksimere brugerens jobchance
+- 50% samtalechance som overordnet kvalitetsmål — alt output måles mod dette
+- Lag 0 dokument-analyse som næste arkitekturkrav: interviewet skal starte fra analyseret dokumentation, ikke fra nul
 ## Aktuel baseline
 - Safe baseline: main
 - Seneste commit: f210648 — Merge PR #15 (product requirements and idea backlog)
@@ -54,4 +59,5 @@ JobPilot er et AI-baseret job search operating system, ikke kun en CV-generator.
 - LAG4_PROFILE_TEMPLATE.md
 - VENDOR_ABSTRACTION_DESIGN.md (ny, session 5)
 - BENCHMARK_SUITE_DESIGN.md (ny, session 5)
+- JOBPILOT_PROFILE_ARCHITECTURE.md (ny, session 6)
 - V1 projektplan defineret med 7 milepæle over 8 uger
