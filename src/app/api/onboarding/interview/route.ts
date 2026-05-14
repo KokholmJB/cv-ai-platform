@@ -3110,7 +3110,7 @@ async function buildAICompletionAnalysis({
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           max_tokens: 3000,
           system: systemPrompt,
           tools: [toolSchema],
@@ -3126,7 +3126,8 @@ async function buildAICompletionAnalysis({
 
       if (!response.ok) {
         if (process.env.NODE_ENV !== "production") {
-          console.debug(`[lag2] Anthropic API error ${response.status}`);
+          const body = await response.text();
+          console.error(`[lag2] API response status: ${response.status}`, body);
         }
         return null;
       }
@@ -3146,7 +3147,10 @@ async function buildAICompletionAnalysis({
         if (!(key in (parsed as Record<string, unknown>))) return null;
       }
       return parsed;
-    } catch {
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[lag2] AI error:", err instanceof Error ? err.message : String(err));
+      }
       return null;
     }
   }
