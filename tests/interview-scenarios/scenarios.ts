@@ -1049,4 +1049,454 @@ export const interviewScenarios: InterviewScenario[] = [
       },
     },
   },
+  {
+    id: "extreme-laconic-warehouse",
+    label: "Extreme laconic warehouse worker — minimal verbal communication",
+    profileDraft: {
+      name: "Bjoern",
+      currentRole: "Lagermedarbejder",
+      yearsExperience:
+        "22 aar i samme lagervirksomhed. Pluk, pak, truck, optaelling og varemodtagelse. Aldrig problemer.",
+      targetDirection: "Mere loen. Kortere transport.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["career_change", "leadership", "management"],
+    scriptedAnswers: {
+      default: "Det gaar fint. 22 aar paa lager. Vil have mere i loen og kortere transport.",
+      byFamily: {
+        current_work_reality: "Plukker varer og kjoerer truck. Optaeller lageret. Rutinedag. Det kender jeg.",
+        resultEvidence: "Faa fejl og altid til tiden. Det er mit bidrag til firmaet.",
+        mismatch_risk: "Mere loen og kortere transport. De to ting er det jeg soeger.",
+        responsibility: "Mit eget arbejde. Goer det rigtigt. Ingen andres paller.",
+        ownership: "Ja, det passer jeg selv. Har gjort det i 22 aar.",
+      },
+    },
+    expectedSignals: [
+      "same warehouse role preferred",
+      "better pay motivation",
+      "minimal commute preference",
+      "22 years stable experience base",
+    ],
+    loopFamiliesToWatch: ["current_work_reality", "resultEvidence", "mismatch_risk"],
+    completionQuality: {
+      complexity: "simple",
+      suspiciousEarlyTurns: 2,
+      expectedConcepts: ["lager", "loen"],
+      minimumMatchedConcepts: 1,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        interviewReadiness: {
+          required: true,
+        },
+      },
+    },
+    maxTurns: 12,
+  },
+  {
+    id: "verbose-overexplainer",
+    label: "Verbose overexplainer — public sector manager seeking private sector move",
+    profileDraft: {
+      name: "Charlotte",
+      currentRole: "Kontorchef i offentlig forvaltning",
+      yearsExperience:
+        "12 aar som kontorchef i offentlig forvaltning med personaleansvar for ni medarbejdere, budgetstyring, sagsbehandling, tvaergaaende koordinering og politisk betjening.",
+      targetDirection:
+        "Privat sektor, kontorchef-lignende eller tilsvarende lederrolle med bedre udviklingsmuligheder og kortere beslutningsveje.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["more_responsibility", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Det kommer an paa hvad man maener med det, men jeg vil proeve at saette ord paa. Jeg har siddet i forvaltningen i 12 aar og er rigtig glad for det faglige miljoee og mine kollegaer, men de seneste par aar er der opstaaet en slags metning i forhold til hvad den offentlige sektor kan tilbyde mig som leder. Det handler ikke om at arbejdet er kedeligt — det er det ikke — men mere at tempo, beslutningskraft og muligheden for at se konkrete resultater er mere begraensede end jeg ville oenske. Naar jeg taler med bekendte i det private, saa er der noget i maaden de beskriver arbejdsdagen paa der tiltraekker mig. En faelles fra studiet arbejder som operations manager i en mellemstor virksomhed og beskriver kortere vej fra idé til beslutning og mere direkte ansvar for maalbare resultater. Det er den retning jeg traekkes imod. Jeg er ikke sikker paa at det er det rigtige valg, og der er elementer ved det offentlige jeg vil savne — men jeg tror mine kompetencer er genanvendelige i en privat kontekst. Saa det er vel forklaringen paa at jeg kigger videre nu.",
+      byFamily: {
+        current_work_reality:
+          "Min hverdag er rimelig varieret hvis man ser det bredt. Jeg leder en administrativ afdeling med ni medarbejdere — ansvaret daekker alt fra daglig planlaegning, individuelle opfoelgningssamtaler, MUS og i sjeldnere tilfaelde ogsaa personalesager, omend vi heldigvis ikke har mange af dem. Derudover har jeg en del faglige opgaver: koordinering paa tvaers af afdelinger, notater og indstillinger til direktion og politisk niveau og deltagelse i projektgrupper. I det offentlige forventes man som leder stadig at have faglig substans og ikke kun lede. Det er en styrke men ogsaa et tidspres. En kollega sagde engang at vi i forvaltningen er som generalistspecialister — vi ved meget om lidt af alt men aldrig alt om noget bestemt. Det ramte mig egentlig lidt. Jeg anslaar at jeg bruger en tredjedel af min tid paa ledelse, en tredjedel paa faglige opgaver og resten paa tvaergaaende koordinering. Det er nok ret typisk for det niveau.",
+        resultEvidence:
+          "Det er altid svart at svare paa i det offentlige, fordi resultater er mere diffuse end i det private. Men et tydeligt eksempel er en omorganisering vi gennemfoerte for to aar siden — to enheder skulde slaaes sammen. Det var et projekt der tog et aar med mange interessenter og modsatrettede forventninger. Jeg stod for processen: holdt alle med, lavede kompromisoplaeggene og drev implementeringen i praksis. Vi endte med at reducere sagsbehandlingstiden med 18 procent, og teamet triedes bedre end foer fusionen. Ledelsen var tilfreds og medarbejderne var tilfreds. Det er sjeldent at man kan sige begge dele. Jeg vil ogsaa naevne at vi fik ros for haandteringen af en kompleks klagesag der gik til Ankestyrelsen — vi vandt, og det var et godt signal om at vi goer tingene rigtigt og med den rette grundighed.",
+        mismatch_risk:
+          "Det er et omraade jeg har reflekteret over, fordi jeg har haft samtaler der viste sig at vaere et daarligt match, og det laerte mig noget. Organisationer der ikke respekterer at ledelse kraever tid og rum fungerer ikke for mig — steder hvor man forventes at producere paa fuld kapacitet som fagperson og lede paa fuld kapacitet samtidig. Jeg er leder, ikke super-fagekspert, selv om jeg naturligvis har faglig dybde. Et andet klart fravalg er lange beslutningskæder, hvor selv smaabeslutninger kraever tre niveauer og to udvalg. Jeg forstaar at det er en del af den offentlige virkelighed, og det er faktisk noget af det jeg vil vaek fra. Et godt match er et sted med klar mandatfordeling, kortere beslutningsveje og respekt for at administrativ ledelse er en reel kompetence og ikke bare en praktisk rolle man tildeler nogen. Niveauet skal svare til hvad jeg har nu — jeg soeger ikke opad, men et miljoee der passer bedre til min maade at arbejde og levere paa.",
+      },
+    },
+    expectedSignals: [
+      "public to private sector move",
+      "same leadership level desired",
+      "shorter decision paths valued",
+      "verbose communication style",
+    ],
+    loopFamiliesToWatch: ["current_work_reality", "resultEvidence", "mismatch_risk"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["kontorchef", "forvaltning", "privat"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        communicationProfile: {
+          required: true,
+        },
+      },
+    },
+  },
+  {
+    id: "money-motivated-pragmatist",
+    label: "Money-motivated pragmatist — explicit economic driver, no sector loyalty",
+    profileDraft: {
+      name: "Gustav",
+      currentRole: "Mellemleder i finanssektor",
+      yearsExperience:
+        "15 aar i finanssektoren med portefoelje- og risikoopfoelgning, teamledelse, rapportering og kundekontakt. Goer arbejdet godt fordi det betaler sig.",
+      targetDirection:
+        "Hoejere loen og bedre vilkaar. Sektoren er ligegyldig saa laenge loennen er der. Gerne hybridarbejde.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["leadership_progression", "promotion"],
+    scriptedAnswers: {
+      default:
+        "Det er et job. Jeg er god til det og det har betalt sig godt. Men markedet er aendret og jeg vil have mere i loen for det jeg leverer. Jeg er ikke sentimental over for sektoren — det er bare der pengene har vaeret. Hvis noget andet betaler bedre og kraever lignende kompetencer, er jeg aaben for det.",
+      byFamily: {
+        resultEvidence:
+          "Vi leverede rettidigt i tre aar. Fejlraten gik ned. Kundeklager faldt mærkabart. Det er tal jeg kan staa paa.",
+        mismatch_risk:
+          "For lidt i loen er et klart fravalg. Og steder der vil have mig tilgaengelig 24-7 uden kompensation. Hybridarbejde er et krav, ikke et oenske.",
+        current_work_reality:
+          "Portefoelje-opfoelgning, risikorapportering og ledelse af et lille team. Rutineagtig uge med faste deadlines og klare leverancer.",
+        responsibility:
+          "Teamet, rapporterne, kundekontakten. Standardiseret og forudsigeligt — fungerer fint saalænge rammen er klar.",
+        ownership:
+          "Mit ansvar er tydeligt defineret. Jeg goer det jeg er ansat til og leverer hvad der loves.",
+      },
+    },
+    expectedSignals: [
+      "explicit money motivation",
+      "no sector loyalty",
+      "same role type preferred",
+      "pragmatic work philosophy",
+    ],
+    loopFamiliesToWatch: ["resultEvidence", "current_work_reality", "mismatch_risk"],
+    completionQuality: {
+      complexity: "simple",
+      suspiciousEarlyTurns: 2,
+      expectedConcepts: ["finans", "loen", "mellemleder"],
+      minimumMatchedConcepts: 1,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        lifestyleProfile: {
+          forbiddenPatterns: [/"workIntensityPreference":"high"/],
+        },
+      },
+    },
+  },
+  {
+    id: "family-first-parent",
+    label: "Family-first parent — geographic and schedule constraints drive job search",
+    profileDraft: {
+      name: "Karen",
+      currentRole: "Regnskabsmedarbejder",
+      yearsExperience:
+        "9 aar med debitorbogholderi, finansiel rapportering, maaanedsaflukninger og samarbejde med revision. Netop flyttet til Randers med familien.",
+      targetDirection:
+        "Regnskabs- eller administrativ stilling i Randers-omraadet. Fleksibel dagligdag er vigtig pga. boern i skolen.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["career_change", "leadership", "management"],
+    scriptedAnswers: {
+      default:
+        "Vi er netop flyttet til Randers — min mand har faaet nyt job deroppe — saa jeg soeger noget lokalt nu. Jeg vil gerne bruge mine regnskabskompetencer, men det er vigtigt at arbejdstiderne er normale saa jeg kan hente boernene. Rejseaktivitet eller sene aftener er ikke mulige for mig i denne periode af livet.",
+      byFamily: {
+        mismatch_risk:
+          "Et daarligt match er steder der forventer overarbejde, rejseaktivitet eller at man er tilgaengelig paa alle tidspunkter. Jeg kan ikke hente boern hvis jeg er i Aarhus hver uge. Et godt match er en stabil dagstilling med fast struktur og normale arbejdstider.",
+        current_work_reality:
+          "Min hverdag har vaeret debitorbogholderi, maaanedsaflukninger, kontoafstemninger og rapportering. Rutineagtig og stabil — det passer mig godt.",
+        resultEvidence:
+          "Jeg fik reduceret vores udestaaende debitorbalance med 30 procent over et aar ved at forbedre rykkerprocedurerne og opfoelgningsprocessen systematisk.",
+        responsibility:
+          "Regnskabsfunktioner inden for mit omraade. Samarbejde med revision ved aarsluk. Foer flytningen hjalp jeg ogsaa en junior-kollega med onboarding.",
+      },
+    },
+    expectedSignals: [
+      "geographic constraint — Randers area only",
+      "school pickup schedule requirement",
+      "same accounting track",
+      "family logistics as primary driver",
+    ],
+    loopFamiliesToWatch: ["mismatch_risk", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "simple",
+      suspiciousEarlyTurns: 2,
+      expectedConcepts: ["regnskab", "Randers", "boern"],
+      minimumMatchedConcepts: 1,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        lifestyleProfile: {
+          required: true,
+          forbiddenPatterns: [/"workIntensityPreference":"high"/],
+        },
+      },
+    },
+  },
+  {
+    id: "reverse-direction-director",
+    label: "CEO wanting to return to craft — radical downward direction change",
+    profileDraft: {
+      name: "Jens",
+      currentRole: "CEO i mellemstor virksomhed",
+      yearsExperience:
+        "12 aar som direktoer for virksomhed med 45 ansatte. Startede som elektriker og arbejdede 10 aar i faget. Savner det konkrete haandvaerk og vil tilbage til det.",
+      targetDirection:
+        "Elektriker igen. Starte forfra. Vil ikke vaere direktoer laengere og vil heller ikke vaere konsulent. Vil arbejde med haenderne.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: ["more_responsibility", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Jeg savner elektrikerarbejdet. Som direktoer sidder man paa moeder hele dagen og laever beslutninger der aldrig er fuldstaendigt rigtige. Naar jeg var elektriker, saa man hvad man fik lavet. En installation der virker, en fejl man finder og retter — det er tilfredsstillende paa en maade som strategimoeder aldrig er. Jeg er oekonisk fri til at tage valget. Certifikaterne er udloebede og lovgivningen er aendret, saa jeg vil nok starte forfra paa et lavere niveau.",
+      byFamily: {
+        responsibility:
+          "Jeg har haft det fulde oeverste ansvar i 12 aar. Nu vil jeg have ansvar for mit eget arbejde og mine egne installationer — ikke for 45 folks trivsel, budgetter og strategi.",
+        resultEvidence:
+          "Vi tredobledes i omsaetning under min ledelse. Det er et konkret resultat. Men det er ikke det der giver mig energi — det der gav energi var de aar jeg laerte fra en erfaren elektriker og selv maerkede at jeg forstod systemerne.",
+        mismatch_risk:
+          "Et daarligt match er konsulentroller inden for el- eller energibranchen. Jeg vil ikke raadgive — jeg vil arbejde. Et godt match er en mindre elektriker-virksomhed der vil have en person der starter forfra uden at goere det til noget stoerre end det er.",
+        current_work_reality:
+          "Direktoerrollen er moeder, budgetter, strategi og HR. Det er kompetent arbejde, men det er laenge siden jeg sidst goede noget med haenderne. Det er det jeg maangler.",
+      },
+    },
+    expectedSignals: [
+      "radical reverse direction — CEO to electrician",
+      "craft nostalgia as genuine driver",
+      "financially independent choice",
+      "not a consulting compromise",
+    ],
+    loopFamiliesToWatch: ["responsibility", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["direktoer", "elektriker", "haandvaerk", "forfra"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        evidenceProfile: {
+          required: true,
+          requiredSubfields: ["transferableStrengths"],
+        },
+      },
+    },
+  },
+  {
+    id: "hyperspecialist-going-generalist",
+    label: "Hyperspecialist seeking breadth — tired of specialist identity",
+    profileDraft: {
+      name: "Lars",
+      currentRole: "Senior data scientist",
+      yearsExperience:
+        "15 aar i analytiske og data-relaterede roller. Dyb ekspertise i statistiske modeller, ML og dataarkitektur. Er personen alle spoerger til raads — men er traet af det.",
+      targetDirection:
+        "Vil vaek fra specialist-rollen og arbejde bredere. Maske produktledelse, tvaerfaglig rolle eller noget andet. Er aaben — vil bare vaek fra at vaere manden de altid ringer til.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: ["leadership", "management", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Jeg er traet af at vaere specialisten alle henvender sig til naar data gaar galt. Det er et aeresgn, men det boender mig ogsaa. Jeg vil arbejde med noget bredere — forstaa forretningen, koble til kunder, bidrage til strategi. Ikke noedvendigvis som leder, men som en person med bredere perspektiv end analysemodeller.",
+      byFamily: {
+        ownership:
+          "Jeg ejer de analytiske beslutninger og modelvalg. Men det er netop problemet — ejer kun den ene dimension. Jeg har aldrig ejet produktretning, kundedialogen eller den forretningsmæssige beslutning.",
+        current_work_reality:
+          "Min hverdag er analyser, modeller, sparring med teams der har et dataproblem og lejlighedsvis workshops med forretningen. Engagerende men smaalt. Alle spoerger Lars naar det er data — og Lars er traet af kun at vaere data.",
+        resultEvidence:
+          "Jeg byggede en prognosemodel der reducerede lagerbinding med 22 procent. Godt resultat. Men jeg var ikke med til at beslutte hvad problemet skulde loese strategisk. Jeg loeste den tekniske del og gav det videre.",
+        mismatch_risk:
+          "Et daarligt match er roller der vil have mig som specialist men med en bredere titel. Jeg vil have reel bredde, ikke bare et finere kort. Jeg soeger heller ikke personaleansvar.",
+      },
+    },
+    expectedSignals: [
+      "specialist fatigue not burnout",
+      "genuine desire for breadth",
+      "multiple possible directions",
+      "not seeking people management",
+    ],
+    loopFamiliesToWatch: ["ownership", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "complex",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["data", "specialist", "bredere", "analytisk"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+          expectedPatterns: [/direction_change|lateral/i],
+        },
+        evidenceProfile: {
+          required: true,
+          requiredSubfields: ["transferableStrengths"],
+        },
+      },
+    },
+  },
+  {
+    id: "generalist-going-specialist",
+    label: "Generalist seeking deep specialization — tired of knowing a little about everything",
+    profileDraft: {
+      name: "Morten",
+      currentRole: "Projektkoordinator og generalist",
+      yearsExperience:
+        "14 aar med bred projektkoordinering, procesoptimering, stakeholderstyring og tvaerfagligt samarbejde paa tvaers af afdelinger. Rigtig god til lidt af alt.",
+      targetDirection:
+        "Vil specialisere mig inden for eet omraade — data-analyse, indkoeb eller procesoptimering. Vil bygge dyb ekspertise frem for fortsat at vaere generalist.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: ["leadership", "management", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Jeg har koordineret alt i 14 aar. Nu vil jeg gerne vaere god til noget specifikt. Jeg er traet af at vaere den der kan lidt af alt men aldrig er den virkelige ekspert. Jeg overvejer data-analyse, indkoeb eller maske procesoptimering som specialisering.",
+      byFamily: {
+        ownership:
+          "Jeg ejer koordineringsprocessen — men aldrig den faglige substans. Jeg er bindeledet mellem eksperterne, men jeg er ikke selv ekspert paa noget bestemt. Det vil jeg gerne aendre.",
+        current_work_reality:
+          "Min hverdag er koordinering, opfoelgning, moedefacilitering og at saerge for at projekter ikke koerer af sporet. Meningsfuldt men bredt — man laerer aldrig rigtig nok inden for eet omraade.",
+        resultEvidence:
+          "Jeg styrede en tvaerfaglig implementering af et nyt ERP-system paa tvaers af tre afdelinger. Det gik godt. Men jeg var koordinatoren, ikke eksperten. Eksperterne var leverandoeren og specialisterne. Jeg vil vaere eksperten naeste gang.",
+        mismatch_risk:
+          "Et daarligt match er steder der vil have mig til at koordinere igen. Jeg er god til det — men det er det jeg vil vaek fra. Et godt match er et sted der vil investere i at laere mig et speciale.",
+      },
+    },
+    expectedSignals: [
+      "generalist fatigue",
+      "desire for deep expertise",
+      "multiple possible specializations",
+      "not seeking management",
+    ],
+    loopFamiliesToWatch: ["ownership", "current_work_reality", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 2,
+      requireUncertainties: true,
+      expectedConcepts: ["koordinator", "specialist", "ekspertise", "generalist"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        evidenceProfile: {
+          required: true,
+          requiredSubfields: ["transferableStrengths"],
+        },
+      },
+    },
+  },
+  {
+    id: "former-entrepreneur-back-to-employment",
+    label: "Former entrepreneur returning to employment — stability vs autonomy tension",
+    profileDraft: {
+      name: "Peter",
+      currentRole: "Selvstaendig IT-konsulent, tidligere fastansat",
+      yearsExperience:
+        "8 aar som fastansat software- og systemkonsulent, derefter 6 aar som selvstaendig med eget IT-konsulentfirma. Virksomheden er lukket. Vil nu tilbage i fast ansaettelse.",
+      targetDirection:
+        "Fast ansaettelse som IT-konsulent eller solution architect. Vil have stabiliteten tilbage. Usikkerheden er ikke laengere vaerd det.",
+    },
+    intendedDirectionType: "same_track",
+    expectedDoNotAssume: ["leadership_progression", "management", "leadership"],
+    scriptedAnswers: {
+      default:
+        "Jeg har koert for mig selv i seks aar. Det var fedt i begyndelsen — man bestemmer selv og slipper for kontorpolitik. Men det slutter aldrig rigtig. Ingen ferie der er rigtig ferie. Ingen kolleger man taler med naar noget er svaert. En dag lukkede jeg og erkendte at stabiliteten vejer tungt. Jeg soeger en fast stilling nu.",
+      byFamily: {
+        ownership:
+          "Som selvstaendig ejede jeg alting — beslutningerne, kunderne, risikoen. Det er en rutsjebane. Det var spaendende. Nu vil jeg eje mine opgaver inden for klare rammer og slippe for den oekonomiske usikkerhed.",
+        current_work_reality:
+          "De seneste seks aar var projekter, kunder og arkitekturopgaver. Varieret og stimulerende — men ensomheden og usikkerheden overstiger nu fordelene ved friheden.",
+        resultEvidence:
+          "Jeg levererede en microservices-arkitektur til en e-commerce kunde der reducerede nedetid med 80 procent over det foelgende aar. Det er mit bedste projekt som selvstaendig.",
+        mismatch_risk:
+          "Et daarligt match er steder der mikrolederer. Det er jeg fravent af seks aars selvstaendighed. Jeg behoever tillid og reel indflydelse paa de tekniske beslutninger. Et godt match er et sted der vil bruge mine erfaringer og respekterer at jeg er vant til autonomi.",
+      },
+    },
+    expectedSignals: [
+      "stability motivation after self-employment",
+      "autonomy habits requiring trust-based culture",
+      "same technical track",
+      "stability as primary need",
+    ],
+    loopFamiliesToWatch: ["ownership", "current_work_reality", "mismatch_risk"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["selvstaendig", "konsulent", "ansaettelse", "stabilitet"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        lifestyleProfile: {
+          required: true,
+        },
+      },
+    },
+  },
+  {
+    id: "career-paradox-high-title-low-mandate",
+    label: "Career paradox — high title but low decision mandate",
+    profileDraft: {
+      name: "Soeren",
+      currentRole: "Head of Operations",
+      yearsExperience:
+        "14 aar i operations og logistik. Nuvaerende titel er Head of Operations, men i praksis koordinerer han andres beslutninger uden reel beslutningsmandat.",
+      targetDirection:
+        "Soeger en rolle med reel beslutningsret og indflydelse paa strategi. Titlen er ligegyldig — mandatet er det centrale.",
+    },
+    intendedDirectionType: "same_track_better_conditions",
+    expectedDoNotAssume: ["leadership_progression", "promotion"],
+    scriptedAnswers: {
+      default:
+        "Min titel siger Head of Operations, men naar jeg ser paa hvad jeg faktisk goer, saa koordinerer jeg andres beslutninger. Jeg indstiller, andre bestemmer. Jeg samler, andre konsoliderer. Det er ikke det jeg forstaar ved en Head of-rolle. Jeg soeger noget med reel indflydelse — selv om titlen bliver mindre.",
+      byFamily: {
+        responsibility:
+          "Formelt er jeg ansvarlig for operations. Reelt er mine beslutninger subject to approval for alt over 100.000 kr. og stort set alle strategiske valg kraever direktion. Jeg har titlen men ikke mandatet.",
+        ownership:
+          "Jeg ejer processerne — men ikke beslutningerne om dem. Jeg kan optimere inden for rammen. Rammen er bestemt af andre.",
+        resultEvidence:
+          "Jeg gennemfoerte en lageroptimering der sparede 15 procent paa haandteringsomkostninger. Projektet var mit, men oekonomien skulde godkendes tre steder og tog seks maaneder ekstra.",
+        mismatch_risk:
+          "Et daarligt match er roller der siger beslutningsansvar men i praksis er koordinering. Jeg kan spotte det nu. Et godt match er en organisation der faktisk lader folk med den rigtige titel goere den rigtige ting.",
+      },
+    },
+    expectedSignals: [
+      "title-mandate paradox",
+      "real decision authority sought",
+      "not seeking more formal leadership",
+      "same operations domain",
+    ],
+    loopFamiliesToWatch: ["responsibility", "ownership", "current_work_reality"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["operations", "beslutning", "mandat", "koordinerer"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+        },
+        credibilitySignals: {
+          required: true,
+        },
+      },
+    },
+  },
 ];
