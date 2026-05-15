@@ -1,8 +1,9 @@
 # TASK_BOARD
 ## Current focus
-- evidenceStrengthVsGoal engine gap (P1 remaining)
+- evidenceStrengthVsGoal engine gap (P1 remaining — Lag 2 prompt-regel tilføjet, rule-based path stadig ukorrekt)
 - P1: anti-keyword-validering pr. scenarie
-- P1: autenticitetsprofil test-dækning (authenticitySignals i motor ✅ — test kan ikke passere med scripted data endnu)
+- P1: autenticitetsprofil test-dækning med rigtige signaler (Lag 2 dynamic injection ✅ — rule-based path stadig low confidence)
+- sales-customer-facing recruitmentLogic WARN (persistent LLM-variance — kræver dybere motor-undersøgelse)
 
 ## Arkitektur-migration Fase 0
 Forudsætninger der skal landes inden pipeline migration kan starte (M2):
@@ -48,6 +49,12 @@ Forudsætninger der skal landes inden pipeline migration kan starte (M2):
 - Indholdsvalidering af completionAnalysis aktiv
 - Autenticitetsprofil testet
 - Projektstyring godkender eksplicit
+## Recently completed (session 12, 2026-05-15)
+- Lag 2 system prompt: 8 prompt-forbedringer (authenticityProfile dynamic injection, workIntensityPreference mapping, naturalTeamRole/behaviorUnderPressure inference, flexibilityNeeds defaults, recruitmentLogic customer-facing, evidenceStrengthVsGoal, fraseforbudsregel)
+- 4 Runde 2-scenarier tilføjet: self-contradicting-manager, overconfident-junior, burnout-recovery, imposter-syndrome-specialist
+- `credibilitySignals` tilføjet til `expectedFieldSignals` type i scenarios.ts
+- Test: 18 PASS / 5 WARN / 0 FAIL (23 scenarier, Lag 2 aktiv)
+
 ## Recently completed (session 5, 2026-05-14)
 - Lag 2 AI-sti implementeret bag `ENABLE_AI_COMPLETION_ANALYSIS` feature flag (claude-opus-4-5, tool_use, fallback)
 - `AuthenticityProfile` type tilføjet + `authenticityProfile` felt i `CompletionAnalysis`

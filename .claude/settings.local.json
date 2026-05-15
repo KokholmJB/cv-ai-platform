@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(**)"
+      "Bash(*)",
+      "Bash(**/*)",
+      "PowerShell(npm.cmd run build 2>&1)",
+      "PowerShell(\\(Get-Content .env.local\\) -replace 'ENABLE_AI_COMPLETION_ANALYSIS=true','ENABLE_AI_COMPLETION_ANALYSIS=false' | Set-Content .env.local; Get-Content .env.local | Select-String \"ENABLE_AI\")"
     ]
   }
 }

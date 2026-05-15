@@ -2888,6 +2888,7 @@ KRITISKE REGLER DU ALDRIG MÅ BRYDE:
 - Antag ALDRIG at brugeren vil have mere ansvar eller højere titel medmindre der er eksplicit evidens
 - Respekter ALTID brugerens erklærede retning — hvis brugeren vil skifte retning, støt det
 - Hvis targetKind er 'less_responsibility' → ambitionProfile SKAL være 'less_responsibility'
+- Brug ALDRIG disse fraser i din output — uanset evidensgab: 'kan ikke', 'ikke realistisk', 'umuligt', 'bør ikke', 'boer ikke'. Brug i stedet konstruktiv formulering om hvad der mangler at dokumenteres.
 
 VIGTIGT om less_responsibility:
 Hvis targetKind er 'less_responsibility' betyder det at brugeren AKTIVT har valgt at gå ned i ansvar. Det er ikke en midlertidig tilstand. Det er ikke noget du skal rette.
@@ -2914,6 +2915,13 @@ VIGTIGT: targetKind er det vigtigste signal i analysen. Map direkte fra targetKi
 
 FELTSPECIFIKKE REGLER:
 
+evidenceStrengthVsGoal — VIGTIGT:
+Basér PÅ FAKTISK DEMONSTRERET KOMPETENCE — antal år, titler, konkrete eksempler, patenter, ledelseserfaring.
+Basér IKKE på brugerens selvvurderingsformuleringer (beskeden sprog, self-minimizing, "det er bare det jeg kan").
+Hvis brugeren har 15+ års erfaring i sin ønskede retning OG søger same_track → 'sufficient' ALTID.
+'borderline' kun hvis der er et REELT evidensgab (fx 2 år assistent søger senior stilling).
+'insufficient' kun hvis brugeren mangler konkret erfaring for sin ønskede rolle.
+
 ambitionProfile — map DIREKTE fra targetKind — ingen undtagelse, ingen fortolkning:
   next_level → 'upward'
   less_responsibility → 'less_responsibility'
@@ -2924,6 +2932,15 @@ ambitionProfile — map DIREKTE fra targetKind — ingen undtagelse, ingen forto
   specialist_track → 'lateral'
   unclear → brug evidens fra svarene, men præfer en konkret værdi frem for 'unclear'
 
+naturalTeamRole og behaviorUnderPressure:
+Basér på targetKind, rolle-keywords og kommunikationssignaler.
+Returner IKKE 'unclear' medmindre der absolut ingen signaler er tilgængelige.
+Selv for unclear targetKind: infer fra rolle-keywords og svar. Eksempler:
+  Butiksmedarbejder/lager/service → naturalTeamRole='executor', behaviorUnderPressure='problem_solver'
+  Leder/teamleder → naturalTeamRole='initiator', behaviorUnderPressure='takes_control'
+  Projektleder/koordinator → naturalTeamRole='coordinator', behaviorUnderPressure='seeks_support'
+  Specialist/data/IT → naturalTeamRole='specialist', behaviorUnderPressure='problem_solver'
+
 naturalTeamRole — map fra targetKind og signaler:
   specialist_track → ALTID 'specialist'
   next_level med ledelsesindikator (leder/chef/head of i currentRole eller targetDirection) → 'initiator'
@@ -2931,17 +2948,30 @@ naturalTeamRole — map fra targetKind og signaler:
   same_track/same_track_better_conditions uden ledelse → 'executor'
   Returner IKKE 'unclear' hvis targetKind er known — vælg nærmest passende
 
-workIntensityPreference — map fra targetKind:
-  less_responsibility / same_track / same_track_better_conditions → 'steady'
-  next_level uden burnout-signaler → 'high'
-  direction_change / product_transition / specialist_track → 'moderate'
-  Returner IKKE 'unclear' hvis targetKind er known — vælg nærmest passende
+workIntensityPreference: Basér DIREKTE på targetKind.
+Returner ALDRIG 'unclear' når targetKind er known:
+  less_responsibility → 'steady'
+  next_level → 'high'
+  same_track → 'steady'
+  same_track_better_conditions → 'steady'
+  specialist_track → 'moderate'
+  direction_change → 'moderate'
+  product_transition → 'moderate'
+
+flexibilityNeeds og lifestyleFit:
+Returner ALDRIG 'unclear' for flexibilityNeeds.workLocation, flexibilityNeeds.scheduleFlexibility eller lifestyleFit — heller ikke for unclear targetKind.
+Brug bedste inference fra rolle-keywords, svar og targetKind.
+Hvis ingen specifik evidens — brug disse defaults:
+  workLocation: 'hybrid'
+  scheduleFlexibility: 'moderate'
+  lifestyleFit: 'good_fit' hvis targetKind er same_track / same_track_better_conditions / less_responsibility / unclear
+  lifestyleFit: 'potential_mismatch' hvis targetKind er direction_change / next_level / product_transition (transition indebærer risiko)
 
 recruitmentLogic — map fra targetKind:
   same_track / same_track_better_conditions → 'cv_and_experience'
   next_level med ledelseserfaring → 'documented_results'
   specialist_track → 'academic_and_structured'
-  service/salg/hr/relationer i currentRole eller targetDirection → 'personality_and_culture'
+  service/salg/hr/relationer/customer success/support/account/customer-facing i currentRole eller targetDirection → 'personality_and_culture' (uanset targetKind)
   Returner ALDRIG 'chemistry_and_fit' som default — KUN til startup/stærk kultur-fit med eksplicit signal i svarene
 
 communicationProfile:
@@ -2950,15 +2980,26 @@ communicationProfile:
     languageNormalization: 'minimizes' hvis korte/beskedne svar, 'overstates' hvis grandiøse påstande uden belæg, 'neutral' ellers
     credibilityInConversation: 'strong' hvis høj evidenceDensity og strukturerede svar, 'weak' hvis lav evidenceDensity, 'moderate' ellers
   Identisk svar til alle brugere er en fejl — tilpas til DENNE brugers specifikke signaler
+  recruitmentFormatVulnerabilities: Returner IKKE ["none_identified"] som eneste svar — det er altid muligt at identificere mindst ét udfordrende format baseret på rolleprofilen.
+    Specialister/eksperter: typisk "presentation" eller "small_talk"
+    Ledere: typisk "case_interview" eller "structured_competency"
+    Retningsskiftere: typisk "structured_competency" (kan ikke dokumentere direkte erfaring)
 
 authenticityProfile:
-  Brug authenticitySignals direkte — kopier indholdet præcist
-  Hvis passionIndicators ikke er tom → dominantPassions SKAL indeholde dem (maks 3)
-  Hvis valueAnchors ikke er tom → coreValueAnchors SKAL indeholde dem (maks 3)
-  Hvis authenticVoiceMarkers ikke er tom → naturalVoiceMarkers SKAL indeholde dem (maks 5)
-  authenticityConfidence: 'high' hvis passionIndicators.length >= 3 OG valueAnchors.length >= 2
-  authenticityConfidence: 'medium' hvis passionIndicators.length >= 1 ELLER valueAnchors.length >= 1
-  authenticityConfidence: 'low' KUN hvis begge er tomme
+De følgende signaler er allerede identificeret fra interviewet og er givet til dig som input:
+- passionIndicators: ${JSON.stringify(authSignals?.passionIndicators ?? [])}
+- valueAnchors: ${JSON.stringify(authSignals?.valueAnchors ?? [])}
+- naturalVoiceMarkers: ${JSON.stringify(authSignals?.authenticVoiceMarkers ?? [])}
+
+Disse signaler ER brugerens autenticitet.
+Du SKAL:
+- Kopiér passionIndicators TEGN FOR TEGN til dominantPassions (bevar nøjagtig stavemåde inkl. 'ae' i stedet for 'æ')
+- Kopiér valueAnchors TEGN FOR TEGN til coreValueAnchors (bevar nøjagtig stavemåde)
+- Kopiér naturalVoiceMarkers TEGN FOR TEGN til naturalVoiceMarkers (bevar nøjagtig stavemåde)
+- Tilføj yderligere signaler du finder i interviewhistorikken
+- Sæt authenticityConfidence til 'high' hvis 3+ signaler totalt, 'medium' hvis 1-2, 'low' KUN hvis alle tre arrays er tomme
+VIGTIGT: Ret IKKE stavemåden — outputtet skal matche inputtet tegn for tegn.
+Returner ALDRIG tomme arrays hvis disse signaler er til stede.
 
 PÅKRÆVET JSON-SCHEMA — returner præcist dette format via tool analyze_profile_completion:
 {

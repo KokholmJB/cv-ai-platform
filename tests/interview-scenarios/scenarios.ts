@@ -42,6 +42,7 @@ export type CompletionQualityExpectations = {
     evidenceProfile?: FieldSignalExpectation;
     communicationProfile?: FieldSignalExpectation;
     authenticityProfile?: FieldSignalExpectation;
+    credibilitySignals?: FieldSignalExpectation;
   };
 };
 
@@ -849,6 +850,201 @@ export const interviewScenarios: InterviewScenario[] = [
             /elsker|braender for|giver mig mening/,
             /vigtigt for mig|vil ikke acceptere|kun hvis/,
           ],
+        },
+      },
+    },
+  },
+  {
+    id: "self-contradicting-manager",
+    label: "Self-contradicting manager (leadership paradox)",
+    profileDraft: {
+      name: "Daniel",
+      currentRole: "Mellemleder i logistikvirksomhed",
+      yearsExperience:
+        "8 aar som mellemleder med 8 direkte medarbejdere, vagtplaner, rekruttering, performance-samtaler og daglig drift i lagermiljoe.",
+      targetDirection:
+        "Jeg er traet af ledelsesansvaret og vil vaek fra det. Det tager for meget energi og jeg savner at arbejde mere fagligt og konkret.",
+    },
+    intendedDirectionType: "unclear",
+    expectedDoNotAssume: ["more_responsibility", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Jeg vil gerne vaek fra ledelsesansvaret. Det er udmattende at have ansvar for folks trivsel, sygemeldinger og konflikter hele tiden. Jeg vil hellere arbejde fagligt og have ro til at goere mit arbejde ordentligt.",
+      byFamily: {
+        responsibility:
+          "Jeg har 8 folks ansvar i min nuvaerende rolle. Egentlig har jeg vaeret god til det — jeg har hjaelpt folk vokse og udvikle sig, og det har faktisk vaeret ret fedt at se dem blive dygtigere. Men det koster for meget paa den lange bane.",
+        resultEvidence:
+          "Et konkret eksempel: jeg coachede en ny medarbejder fra usikker til at kunne klare skiftet alene. Det var faktisk mit bedste projekt i aarevis. Men administrationen og de svaere samtaler — det draener mig mere og mere.",
+        mismatch_risk:
+          "Et daarligt match er steder med mange medarbejdere og konstant HR-problemer. Jeg vil have faglig ro — maske koordinering eller specialistrolle, men ikke personaleansvar.",
+      },
+    },
+    expectedSignals: [
+      "contradiction between stated preference and revealed energy",
+      "leadership fatigue alongside coaching engagement",
+      "genuinely unclear direction",
+    ],
+    loopFamiliesToWatch: ["responsibility", "resultEvidence", "mismatch_risk"],
+    completionQuality: {
+      complexity: "complex",
+      suspiciousEarlyTurns: 4,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["mellemleder", "ledelse", "coaching", "ansvar"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+          expectedPatterns: [/less_responsibility|unclear|better_conditions|lateral/i],
+        },
+        energyConditions: {
+          requiredSubfields: ["peaksAt", "strugglesAt"],
+        },
+      },
+    },
+  },
+  {
+    id: "overconfident-junior",
+    label: "Overconfident junior — Dunning-Kruger overclaim detection",
+    profileDraft: {
+      name: "Oskar",
+      currentRole: "Marketing assistent",
+      yearsExperience:
+        "2 aar som marketing assistent med kampagner, sociale medier og content produktion under vejledning af senior kollegaer.",
+      targetDirection:
+        "Jeg soeger en rolle som marketing strategist eller growth manager. Jeg er god til at drive vaekst og forstaar hurtigt nye strategier og trends.",
+    },
+    intendedDirectionType: "direction_change",
+    expectedDoNotAssume: [],
+    scriptedAnswers: {
+      default:
+        "Jeg har drevet flere kampagner og vaekststrategier i min nuvaerende rolle. Jeg forstaar hurtigt hvad der virker digitalt og tager initiativ til nye ideer. Jeg er klar til et stoerre ansvar og en mere strategisk rolle.",
+      byFamily: {
+        resultEvidence:
+          "Et konkret resultat var en kampagne jeg stod for — den fik gode resultater paa sociale medier. Vi var et team, men jeg koordinerede det meste og drev ideen. Tallene gik op, og vi fik ros for det.",
+        ownership:
+          "Jeg var involveret i strategiudviklingen og leverede input til planen. Min leder godkendte det, men den originale idee kom fra mig. Jeg haevte ansvaret for eksekveringen.",
+        mismatch_risk:
+          "Et daarligt match er steder der ikke vil have ambitionsoese folk. Jeg laerer hurtigt og er klar til ansvar. Et godt match er steder der vil have folk der kan tage fat og levere resultater selvstaendigt.",
+      },
+    },
+    expectedSignals: [
+      "overclaiming beyond actual 2-year junior experience",
+      "strategic framing without strategic evidence",
+      "supervision context minimized",
+    ],
+    loopFamiliesToWatch: ["resultEvidence", "ownership", "mismatch_risk"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["marketing", "assistent", "strategi", "kampagne"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        credibilitySignals: {
+          required: true,
+          expectedPatterns: [/"consistency":"low"|"consistency":"medium"/],
+        },
+        evidenceProfile: {
+          expectedPatterns: [/borderline|insufficient/],
+        },
+      },
+    },
+  },
+  {
+    id: "burnout-recovery",
+    label: "Burnout recovery — seeking sustainable role after overload",
+    profileDraft: {
+      name: "Mette",
+      currentRole: "Projektleder, sygemeldt i 6 maaneder pga. udbraendthed",
+      yearsExperience:
+        "12 aar med projektledelse, interessentstyring og koordinering i konsulentbranchen med mange overtimer og kontinuerligt hoejt pres.",
+      targetDirection:
+        "Jeg er ved at komme mig efter udbraendthed og soeger en mere baerekraftig rolle. Jeg vil tilbage til arbejde i klare raammer med normal arbejdstid og lavere stressniveau. Jeg er ikke klar til store ledelsesopgaver.",
+    },
+    intendedDirectionType: "less_responsibility",
+    expectedDoNotAssume: ["more_responsibility", "promotion", "leadership_progression"],
+    scriptedAnswers: {
+      default:
+        "Jeg er ved at komme mig efter udbraendthed. Jeg ved at jeg er god til koordinering og projektledelse, men jeg er ikke klar til det pres jeg haevte foer. Jeg soeger noget med normale timer og realistiske forventninger til en person.",
+      byFamily: {
+        responsibility:
+          "Foer udbraendtheden haevte jeg ansvar for 5-6 projekter og konstant kundekontakt. Nu soeger jeg noget med maske et enkelt projekt og klare raammer. Jeg er villig til at gaae ned i titel og loen for den rigtige rolle.",
+        mismatch_risk:
+          "Et daarligt match er steder med altid-paa-kulturen, mange parallelle opgaver og uforudsigelige deadlines. Et godt match er strukturerede roller med realistiske forventninger og respekt for min arbejdstid og energi.",
+        resultEvidence:
+          "Jeg leverede mange projekter til tiden foer jeg gik ned. Men det kostede mig sundheden. Jeg er stadig god til det faglige — jeg har bare laert hvad jeg ikke kan blive ved med at goere paa den maade.",
+      },
+    },
+    expectedSignals: [
+      "burnout context and recovery phase",
+      "deliberate pace reduction not career change",
+      "sustainability as primary requirement",
+    ],
+    loopFamiliesToWatch: ["responsibility", "mismatch_risk", "resultEvidence"],
+    completionQuality: {
+      complexity: "moderate",
+      suspiciousEarlyTurns: 3,
+      requireUncertainties: true,
+      expectedConcepts: ["udbraendthed", "projektleder", "baerekraftig", "pres"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        behaviorProfile: {
+          forbiddenExactValues: ["upward"],
+          expectedPatterns: [/less_responsibility|better_conditions/],
+        },
+        lifestyleProfile: {
+          forbiddenPatterns: [/"workIntensityPreference":"high"/],
+        },
+      },
+    },
+  },
+  {
+    id: "imposter-syndrome-specialist",
+    label: "Imposter syndrome specialist — systematic underselling of strong evidence",
+    profileDraft: {
+      name: "Niels",
+      currentRole: "Senior software arkitekt",
+      yearsExperience:
+        "25 aar med systemarkitektur, teknisk ledelse og design af stoerskala-systemer. Har 7 patenter og er bredt anerkendt i fagmiljoeet.",
+      targetDirection:
+        "Jeg soeger naeste rolle som senior arkitekt eller teknisk lead. Jeg er vel saadan ok til det — det er i hvert fald det andre siger.",
+    },
+    intendedDirectionType: "same_track",
+    expectedDoNotAssume: ["leadership", "promotion"],
+    scriptedAnswers: {
+      default:
+        "Jeg har vaeret med i det her faglange. Det er vel bare det jeg kan goere. Andre er sikkert ligeså gode — eller bedre. Jeg er god til at se systemer i helheder og finde den rigtige arkitektur, men jeg ved ikke om det er noget saerligt.",
+      byFamily: {
+        resultEvidence:
+          "Vi udviklede en platform der nu bruges af tusindvis af brugere. Jeg stod for arkitekturen, men det var jo et teamwork og teamet var dygtigt. Jeg haevte bare stillet de rigtige spoergsmaal paa det rigtige tidspunkt — det kan alle jo goere.",
+        ownership:
+          "Jeg haevte ansvaret for de tekniske beslutninger, men de blev jo truffet med input fra alle. Jeg ved ikke om jeg kan sige at jeg ejede det. Patenterne er vel registreret under mit navn, men det er mere en formalitet.",
+        mismatch_risk:
+          "Et godt match er steder der vil have en teknisk person der kan bidrage. Jeg er nok ikke noget saerligt, men jeg er grundig og forstaår komplicerede systemer — det har andre sagt er nyttigt.",
+      },
+    },
+    expectedSignals: [
+      "systematic underselling of significant expertise",
+      "strong evidence despite self-minimizing language",
+      "imposter syndrome framing",
+    ],
+    loopFamiliesToWatch: ["resultEvidence", "ownership", "mismatch_risk"],
+    completionQuality: {
+      complexity: "complex",
+      suspiciousEarlyTurns: 2,
+      requireUncertainties: true,
+      requireHypotheses: true,
+      expectedConcepts: ["arkitekt", "patenter", "senior", "systemer"],
+      minimumMatchedConcepts: 2,
+      expectedFieldSignals: {
+        evidenceProfile: {
+          required: true,
+          expectedPatterns: [/sufficient|borderline/],
+        },
+        hiddenStrengths: {
+          required: true,
+          expectedPatterns: [/\[.+\]/],
         },
       },
     },
