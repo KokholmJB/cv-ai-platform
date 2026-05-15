@@ -1,5 +1,28 @@
 # TEST_LOG
 
+## Session 2 afslutning — 2026-05-15
+
+### test:interview-scenarios (rule-based, flag=false)
+- 20 PASS / 12 WARN / 0 FAIL
+- 32 scenarier total
+- Top WARN: behaviorProfile:unclear (11) — rule-based limitation
+
+### test:interview-scenarios (Lag 2 aktiv, flag=true, Haiku)
+- 18 PASS / 5 WARN / 0 FAIL (testet på 23 scenarier)
+- Lag 2 markant bedre end rule-based
+
+### test:interview-manual-regression
+- 5 GRØN / 1 YELLOW (product-transition-gap — accepteret)
+
+### test:interview-low-clarity
+- 8/8 PASS / 0 hints
+
+### test:setup-ux-review
+- 0 WARN / 0 FAIL (browser ikke aktiv)
+
+### build
+- Clean ✓
+
 ## Latest confirmed state (session 12, 2026-05-15)
 - `npm.cmd run build`: pass (typecheck clean)
 - `npm.cmd run test:interview-scenarios` **(Lag 2 aktiv)**: 18 PASS / 5 WARN / 0 FAIL (23 scenarier)

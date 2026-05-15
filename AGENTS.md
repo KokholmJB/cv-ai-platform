@@ -99,6 +99,15 @@ npm.cmd run build
 
 Use Windows-compatible commands because the repo is developed on Windows.
 
+## Kommando-regler for Claude Code (KRITISK)
+For at undgå PowerShell-bekræftelse — følg disse regler:
+- Aldrig brug pipe-tegn (|) i shell-kommandoer
+- Aldrig brug 2>&1 redirect
+- Gem output til temp-filer: npm.cmd run test > temp.txt
+- Læs temp-filer: Get-Content temp.txt
+- Kør altid én kommando ad gangen
+- Brug aldrig: Select-String, Out-File, eller chained kommandoer
+
 ## Reporting requirements
 
 After each task, report:
